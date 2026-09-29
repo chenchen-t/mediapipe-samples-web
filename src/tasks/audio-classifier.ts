@@ -101,8 +101,8 @@ class AudioClassifierTask extends BaseAudioTask {
 
     if (type === 'CLASSIFY_RESULT') {
       const { results, inferenceTime } = event.data;
-      this.updateStatus(`Done in ${Math.round(inferenceTime)}ms`);
-      this.updateInferenceTime(inferenceTime);
+      const avgTime = this.updateInferenceTime(inferenceTime);
+      this.updateStatus(`Done in ${Math.round(avgTime)}ms`);
       this.displayClassificationResults(results);
     } else {
       super.handleWorkerMessage(event);

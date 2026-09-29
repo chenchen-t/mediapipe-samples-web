@@ -69,4 +69,43 @@ test.describe('Navigation & UI', () => {
     await expect(privacyLink).toHaveAttribute('target', '_blank');
     await expect(privacyLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
+
+  test('should display docs overview, task guide, and StackBlitz banner links and update on navigation', async ({
+    page,
+  }) => {
+    const banner = page.locator('.docs-banner');
+    await expect(banner).toBeVisible();
+
+    const overviewLink = page.locator('#banner-docs-overview');
+    await expect(overviewLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/guide'
+    );
+
+    const taskDocsLink = page.locator('#banner-task-docs');
+    await expect(taskDocsLink).toContainText('Object Detector Guide');
+    await expect(taskDocsLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/vision/object_detector/web_js'
+    );
+
+    const stackblitzLink = page.locator('#banner-stackblitz');
+    await expect(stackblitzLink).toContainText('Edit in StackBlitz');
+    await expect(stackblitzLink).toHaveAttribute(
+      'href',
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fobject-detector.ts'
+    );
+
+    // Navigate to another task and verify banner links update
+    await page.click('a[data-task="image-segmenter"]');
+    await expect(taskDocsLink).toContainText('Image Segmenter Guide');
+    await expect(taskDocsLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter/web_js'
+    );
+    await expect(stackblitzLink).toHaveAttribute(
+      'href',
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fimage-segmenter.ts'
+    );
+  });
 });

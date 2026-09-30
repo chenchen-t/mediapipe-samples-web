@@ -562,8 +562,8 @@ class InteractiveSegmenterTask extends BaseVisionTask {
 
       const { maskBitmap, inferenceTime } = event.data;
       if (inferenceTime > 0) {
-        this.updateInferenceTime(inferenceTime);
-        this.updateStatus(`Done in ${Math.round(inferenceTime)}ms`);
+        const avgTime = this.updateInferenceTime(inferenceTime);
+        this.updateStatus(`Done in ${Math.round(avgTime)}ms`);
       }
 
       if (this.currentMaskBitmap) {

@@ -15,6 +15,7 @@
  */
 
 import { ModelSelector } from './model-selector';
+import { InferenceTimer } from './inference-timer';
 
 export interface BaseTaskOptions {
   container: HTMLElement;
@@ -33,6 +34,7 @@ export abstract class BaseTask {
   protected models: Record<string, string> = {};
   protected modelSelector!: ModelSelector;
   protected currentDelegate: 'CPU' | 'GPU' = 'GPU';
+  protected inferenceTimer = new InferenceTimer();
 
   protected isWorkerReady = false;
 
@@ -149,11 +151,13 @@ export abstract class BaseTask {
         await this.initializeTask();
       }
     );
+    this.inferenceTimer.mount();
   }
 
   protected async initializeTask(): Promise<void> {
     document.querySelector('.viewport')?.classList.add('loading-model');
     this.isWorkerReady = false;
+    this.inferenceTimer.resetRollingWindow();
     this.updateStatus('Loading Model...');
 
     // @ts-ignore
@@ -184,14 +188,15 @@ export abstract class BaseTask {
   protected updateStatus(msg: string) {
     const el = document.getElementById('status-message');
     if (el) el.innerText = msg;
+    this.inferenceTimer.syncStatusVisibility(msg);
   }
 
-  protected updateInferenceTime(time: number) {
-    const el = document.getElementById('inference-time');
-    if (el) el.innerText = `Inference Time: ${time.toFixed(2)} ms`;
+  protected updateInferenceTime(time: number): number {
+    return this.inferenceTimer.record(time, this.currentDelegate);
   }
 
   public cleanup() {
+    this.inferenceTimer.cleanup();
     if (this.worker) {
       this.worker.postMessage({ type: 'CLEANUP' });
       this.worker.terminate();

@@ -164,7 +164,7 @@ export async function setupTextEmbedder(container: HTMLElement) {
     defaultModelUrl:
       'https://storage.googleapis.com/mediapipe-models/text_embedder/universal_sentence_encoder/float32/1/universal_sentence_encoder.tflite',
     workerFactory: () => new Worker(new URL('../workers/text-embedder.worker.ts', import.meta.url), { type: 'module' }),
-    defaultDelegate: 'CPU',
+    defaultDelegate: 'GPU',
   });
 
   await activeTask.initialize();

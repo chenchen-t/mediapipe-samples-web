@@ -165,7 +165,7 @@ export async function setupTextClassifier(container: HTMLElement) {
       'https://storage.googleapis.com/mediapipe-models/text_classifier/bert_classifier/float32/1/bert_classifier.tflite',
     workerFactory: () =>
       new Worker(new URL('../workers/text-classifier.worker.ts', import.meta.url), { type: 'module' }),
-    defaultDelegate: 'CPU',
+    defaultDelegate: 'GPU',
   });
 
   await activeTask.initialize();

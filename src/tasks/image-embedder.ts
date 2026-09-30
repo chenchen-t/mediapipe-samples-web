@@ -199,7 +199,7 @@ export async function setupImageEmbedder(container: HTMLElement) {
       'https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/1/mobilenet_v3_small.tflite',
     workerFactory: () =>
       new Worker(new URL('../workers/image-embedder.worker.ts', import.meta.url), { type: 'module' }),
-    defaultDelegate: 'CPU',
+    defaultDelegate: 'GPU',
   });
 
   await activeTask.initialize();

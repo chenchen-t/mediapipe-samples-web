@@ -89,6 +89,28 @@ test.describe('Navigation & UI', () => {
       'https://developers.google.com/edge/mediapipe/solutions/vision/object_detector/web_js'
     );
 
+    const webSampleLink = page.locator('#banner-sample-web');
+    const androidSampleLink = page.locator('#banner-sample-android');
+    const iosSampleLink = page.locator('#banner-sample-ios');
+    const pythonSampleLink = page.locator('#banner-sample-python');
+
+    await expect(webSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/object-detector.ts'
+    );
+    await expect(androidSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/object_detection/android'
+    );
+    await expect(iosSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/object_detection/ios'
+    );
+    await expect(pythonSampleLink).toHaveAttribute(
+      'href',
+      'https://colab.research.google.com/github/googlesamples/mediapipe/blob/main/examples/object_detection/python/object_detector.ipynb'
+    );
+
     const stackblitzLink = page.locator('#banner-stackblitz');
     await expect(stackblitzLink).toContainText('Edit in StackBlitz');
     await expect(stackblitzLink).toHaveAttribute(
@@ -102,6 +124,22 @@ test.describe('Navigation & UI', () => {
     await expect(taskDocsLink).toHaveAttribute(
       'href',
       'https://developers.google.com/edge/mediapipe/solutions/vision/image_segmenter/web_js'
+    );
+    await expect(webSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/image-segmenter.ts'
+    );
+    await expect(androidSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/image_segmentation/android'
+    );
+    await expect(iosSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/image_segmentation/ios'
+    );
+    await expect(pythonSampleLink).toHaveAttribute(
+      'href',
+      'https://colab.research.google.com/github/googlesamples/mediapipe/blob/main/examples/image_segmentation/python/image_segmentation.ipynb'
     );
     await expect(stackblitzLink).toHaveAttribute(
       'href',

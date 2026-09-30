@@ -87,6 +87,49 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.docs-banner-samples-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  font-size: 0.8rem;
+}
+
+.docs-banner-samples-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+
+.docs-banner-samples-label .material-icons {
+  font-size: 16px;
+}
+
+.docs-banner-sample-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--text-main);
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.docs-banner-sample-link:hover {
+  color: var(--primary);
+  background: rgba(0, 127, 139, 0.1);
 }
 
 .docs-banner-chip {
@@ -161,6 +204,15 @@
   .docs-banner-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .docs-banner-samples-group {
+    font-size: 0.75rem;
+    padding: 2px 4px 2px 8px;
+  }
+
+  .docs-banner-sample-link {
+    padding: 2px 6px;
   }
 
   .task-stage {

@@ -26,7 +26,7 @@ class ImageClassifierTask extends BaseVisionTask {
   private classificationResultUI: ClassificationResult | undefined;
 
   private maxResults = 3;
-  private scoreThreshold = 0.0;
+  private scoreThreshold = 0.5;
 
   protected override onInitializeUI() {
     this.classificationResultUI = new ClassificationResult('classification-results');

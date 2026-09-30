@@ -29,7 +29,7 @@ class ImageClassifierWorker extends BaseWorker<ImageClassifier> {
       },
       runningMode: this.currentOptions.runningMode || 'IMAGE',
       maxResults: this.currentOptions.maxResults || 5,
-      scoreThreshold: this.currentOptions.scoreThreshold || 0.0,
+      scoreThreshold: this.currentOptions.scoreThreshold ?? 0.5,
     });
   }
 

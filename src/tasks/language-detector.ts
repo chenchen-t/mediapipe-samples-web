@@ -179,7 +179,7 @@ export async function setupLanguageDetector(container: HTMLElement) {
       'https://storage.googleapis.com/mediapipe-models/language_detector/language_detector/float32/1/language_detector.tflite',
     workerFactory: () =>
       new Worker(new URL('../workers/language-detector.worker', import.meta.url), { type: 'module' }),
-    defaultDelegate: 'CPU',
+    defaultDelegate: 'GPU',
   });
 
   await activeTask.initialize();

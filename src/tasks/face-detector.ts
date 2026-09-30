@@ -164,7 +164,7 @@ export async function setupFaceDetector(container: HTMLElement) {
     defaultModelName: 'blaze_face_short_range',
     defaultModelUrl:
       'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
-    defaultDelegate: 'CPU',
+    defaultDelegate: 'GPU',
     workerFactory: () => new Worker(new URL('../workers/face-detector.worker.ts', import.meta.url), { type: 'module' }),
   });
 

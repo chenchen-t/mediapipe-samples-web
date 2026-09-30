@@ -70,6 +70,9 @@ test.describe('Object Detection Task', () => {
     // Check results
     await expect(page.locator('#inference-time')).toContainText('Inference Time:');
     await expect(page.locator('#inference-time')).not.toContainText('- ms');
+    await expect(page.locator('#inference-history-container')).toBeVisible();
+    await expect(page.locator('#inference-history-canvas')).toBeVisible();
+    await expect(page.locator('#inference-cpu-avg')).not.toHaveText('--');
 
     const resultsText = await page.locator('#test-results').textContent();
     const detections = JSON.parse(resultsText || '[]');

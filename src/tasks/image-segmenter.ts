@@ -158,8 +158,8 @@ class ImageSegmenterTask extends BaseVisionTask {
       super.handleWorkerMessage(event);
     } else if (type === 'SEGMENT_RESULT') {
       const { mode, maskBitmap, inferenceTime } = event.data;
-      this.updateStatus(`Done in ${Math.round(inferenceTime)}ms`);
-      this.updateInferenceTime(inferenceTime);
+      const avgTime = this.updateInferenceTime(inferenceTime);
+      this.updateStatus(`Done in ${Math.round(avgTime)}ms`);
 
       if (maskBitmap) {
         if (mode === 'IMAGE') {

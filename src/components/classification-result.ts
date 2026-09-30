@@ -37,18 +37,21 @@ export class ClassificationResult {
         .classification-item {
           display: flex;
           align-items: center;
-          margin-bottom: 16px;
-          padding: 16px;
+          margin-bottom: 6px;
+          padding: 8px 14px;
           background: var(--surface, #fff);
-          border-radius: 12px;
+          border-radius: 8px;
           border: 1px solid var(--border-color, #eee);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+          box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .classification-item:last-child {
+          margin-bottom: 0;
         }
         .class-name {
           width: 160px;
           flex-shrink: 0;
           font-weight: 600;
-          font-size: 14px;
+          font-size: 13px;
           color: var(--text-main, #333);
           text-transform: capitalize;
           white-space: nowrap;
@@ -58,22 +61,22 @@ export class ClassificationResult {
         .class-bar-container {
           flex-grow: 1;
           background: #f0f2f5;
-          height: 10px;
-          border-radius: 5px;
+          height: 8px;
+          border-radius: 4px;
           overflow: hidden;
-          margin: 0 15px;
+          margin: 0 12px;
         }
         .class-bar {
           height: 100%;
           background: var(--primary, #007f8b);
-          border-radius: 5px;
+          border-radius: 4px;
           transition: width 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
         }
         .class-score {
-          width: 45px;
+          width: 42px;
           text-align: right;
           font-family: 'Roboto Mono', monospace;
-          font-size: 14px;
+          font-size: 13px;
           font-weight: 500;
           color: var(--primary, #007f8b);
         }

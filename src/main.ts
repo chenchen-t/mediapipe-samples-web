@@ -33,6 +33,7 @@ import { setupImageClassifier, cleanupImageClassifier } from './tasks/image-clas
 
 import { renderSidebar } from './ui/sidebar';
 import { renderMobileNav } from './ui/mobile-nav';
+import { renderBanner, updateBanner } from './ui/banner';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -44,7 +45,10 @@ app.innerHTML = `
        <button class="menu-toggle material-icons" style="margin-right: 12px; color: var(--text-secondary); background: none; border: none; font-size: 24px; cursor: pointer;">menu</button>
        <div id="mobile-nav-container" style="display: flex; align-items: center; flex-grow: 1;"></div>
     </div>
-    <main class="main-content"></main>
+    <main class="main-content">
+      <div id="docs-banner-container"></div>
+      <div id="task-stage" class="task-stage"></div>
+    </main>
   </div>
 `;
 
@@ -54,6 +58,9 @@ renderSidebar(sidebar);
 
 const mobileNavContainer = app.querySelector('#mobile-nav-container') as HTMLElement;
 renderMobileNav(mobileNavContainer);
+
+const bannerContainer = app.querySelector('#docs-banner-container') as HTMLElement;
+renderBanner(bannerContainer);
 
 // 3. Setup Navigation Logic
 const menuToggles = app.querySelectorAll('.menu-toggle');
@@ -70,7 +77,7 @@ sidebar.addEventListener('click', (e) => {
   }
 });
 
-const mainContent = app.querySelector('.main-content') as HTMLElement;
+const mainContent = app.querySelector('#task-stage') as HTMLElement;
 
 // 4. Router Setup
 const routes = {
@@ -151,6 +158,7 @@ async function router() {
 
   // Setup new task
   if (route) {
+    updateBanner(hash);
     await route.setup(mainContent);
     currentCleanup = route.cleanup;
     document.title = `${route.label} - MediaPipe Web Task Demo`;

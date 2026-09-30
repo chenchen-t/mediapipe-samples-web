@@ -27,7 +27,7 @@ class AudioClassifierTask extends BaseAudioTask {
 
   // Options
   private maxResults = 3;
-  private scoreThreshold = 0.02;
+  private scoreThreshold = 0.5;
 
   // Visualization State
   private WAVEFORM_HISTORY_SIZE = 8000;

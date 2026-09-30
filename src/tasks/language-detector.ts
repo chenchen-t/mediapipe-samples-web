@@ -26,7 +26,7 @@ class LanguageDetectorTask extends BaseTextTask {
   private detectBtn!: HTMLButtonElement;
 
   private maxResults = 3;
-  private scoreThreshold = 0.0;
+  private scoreThreshold = 0.5;
 
   protected override onInitializeUI() {
     this.detectBtn = document.getElementById('detect-btn') as HTMLButtonElement;

@@ -1037,16 +1037,23 @@ video {
     height: auto;
   }
 
-  /* Webcam box follows the real stream aspect ratio (set as
-     --video-aspect by trackVideoAspect) so portrait phone cameras
-     are not squeezed into a tiny 4:3 pillarbox. */
+  /* Webcam box follows the real stream aspect ratio (set as a plain
+     number in --video-aspect by trackVideoAspect) so portrait phone
+     cameras are not squeezed into a tiny 4:3 pillarbox.
+
+     The box must match the stream aspect EXACTLY, never merely contain
+     it: iOS Safari ignores object-fit on a <video> that carries a CSS
+     transform (our mirror flip), so a mismatched box would stretch the
+     video while the overlay canvases stay letterboxed, misaligning
+     masks and landmarks. Hence the height budget is applied by capping
+     the width rather than via max-height. */
   .video-wrapper {
     flex: none;
-    width: 100%;
     height: auto;
-    aspect-ratio: var(--video-aspect, 4 / 3);
-    max-height: 60vh;
-    max-height: 60dvh;
+    aspect-ratio: var(--video-aspect, 1.3333);
+    width: min(100%, calc(60vh * var(--video-aspect, 1.3333)));
+    width: min(100%, calc(60dvh * var(--video-aspect, 1.3333)));
+    margin: 0 auto;
   }
 
   video,

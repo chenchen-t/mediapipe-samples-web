@@ -33,7 +33,10 @@
 
     <div class="viewport" style="display: flex; flex-direction: column; height: 100%">
       <div class="comparison-container" style="padding: 20px; flex-grow: 1; overflow-y: auto; width: 100%">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-height: 0; width: 100%">
+        <div
+          class="comparison-grid"
+          style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; min-height: 0; width: 100%"
+        >
           <!-- Image 1 -->
           <div class="image-input-section" style="display: flex; flex-direction: column; min-width: 0">
             <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-secondary)"
@@ -223,6 +226,29 @@
     }
     100% {
       transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .comparison-container {
+      padding: 8px !important;
+    }
+
+    .comparison-grid {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+    }
+
+    .image-display-area {
+      height: 220px;
+    }
+
+    .similarity-card {
+      padding: 12px 16px;
+    }
+
+    .similarity-value {
+      font-size: 32px;
     }
   }
 </style>

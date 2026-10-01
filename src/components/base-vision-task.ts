@@ -16,6 +16,7 @@
 
 import { ViewToggle } from './view-toggle';
 import { BaseTask, BaseTaskOptions } from './base-task';
+import { trackVideoAspect, clearVideoAspect } from './video-aspect';
 
 export interface BaseVisionTaskOptions extends BaseTaskOptions {}
 
@@ -266,6 +267,7 @@ export abstract class BaseVisionTask extends BaseTask {
       }
 
       this.video.srcObject = stream;
+      trackVideoAspect(this.video);
       const placeholder = document.getElementById('webcam-placeholder');
       if (placeholder) placeholder.style.display = 'none';
 
@@ -313,6 +315,7 @@ export abstract class BaseVisionTask extends BaseTask {
       const tracks = stream.getTracks();
       tracks.forEach((track) => track.stop());
       this.video.srcObject = null;
+      clearVideoAspect(this.video);
       const placeholder = document.getElementById('webcam-placeholder');
       if (placeholder) placeholder.style.display = 'flex';
       if (this.enableWebcamButton) this.enableWebcamButton.innerText = 'Enable Webcam';

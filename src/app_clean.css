@@ -794,6 +794,10 @@ video {
   display: none;
 }
 
+.sidebar-backdrop {
+  display: none;
+}
+
 .menu-toggle {
   display: none;
 }
@@ -842,84 +846,77 @@ video {
   }
 }
 
+/* ------------------------------------------------------------------ */
+/* Phone layout                                                        */
+/*                                                                     */
+/* Desktop uses a fixed-height app shell with independently scrolling  */
+/* panes. Mobile Safari copes badly with nested scroll containers      */
+/* inside an overflow:hidden body (rubber-banding, clipped content,    */
+/* URL bar not collapsing), so on narrow screens we switch to a single */
+/* document scroll where every panel sizes to its content.             */
+/* ------------------------------------------------------------------ */
 @media (max-width: 768px) {
+  :root {
+    --header-height: 56px;
+  }
+
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  #app,
+  .app-container {
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
   .app-container {
     flex-direction: column;
+    overflow: visible;
   }
 
+  /* --- Off-canvas navigation drawer --- */
   .sidebar {
     display: none !important;
-  }
-  .controls-panel {
-    width: 100%;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    padding: 16px;
-  }
-
-  .output-panel {
-    overflow-y: visible;
-  }
-
-  .app-container {
-    height: auto;
-    overflow-y: auto;
   }
 
   .sidebar.open {
     display: flex !important;
     position: fixed;
-    height: 100%;
-    z-index: 1000;
-  }
-
-  .mobile-header {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background-color: var(--surface);
-    border-bottom: 1px solid var(--border-color);
-    height: var(--header-height);
-    position: sticky;
     top: 0;
-    z-index: 100;
+    left: 0;
+    bottom: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: min(85vw, 320px);
+    z-index: 1000;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.25);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
-  .mobile-task-select {
-    padding: 8px 12px;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--border-color);
-    font-size: 16px;
-    background-color: white;
-    flex-grow: 1;
-    margin-left: 10px;
-    max-width: 250px;
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 999;
   }
 
-  .main-content {
-    height: auto;
-    min-height: calc(100vh - var(--header-height));
-    padding: 16px;
-    overflow-y: auto;
+  .sidebar-backdrop.visible {
+    display: block;
   }
 
-  .task-container {
-    flex-direction: column !important;
-  }
-
-  .controls-panel {
-    width: 100%;
-    height: auto;
-    max-height: 40vh;
-    border-right: none;
-    border-bottom: 1px solid var(--border-color);
-    flex-shrink: 0;
-  }
-
-  .output-panel {
-    height: 60vh;
+  body.sidebar-open {
+    overflow: hidden;
   }
 
   .sidebar-header .menu-toggle,
@@ -927,10 +924,215 @@ video {
     display: block;
   }
 
-  .preview-container {
+  /* --- Sticky mobile header with task picker --- */
+  .mobile-header {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    padding-top: calc(8px + env(safe-area-inset-top));
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border-color);
+    min-height: var(--header-height);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .mobile-task-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: none;
+    margin-left: 0;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    font-family: inherit;
+    font-size: 16px;
+    background-color: var(--surface);
+    color: var(--text-main);
+  }
+
+  /* --- Content flows naturally; no fixed heights --- */
+  .main-content,
+  .task-stage {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+  }
+
+  .task-container {
+    flex-direction: column !important;
+    height: auto;
+  }
+
+  /* On a phone the demo matters most: show it first, settings below. */
+  .output-panel {
+    order: 0;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    padding: 12px;
+  }
+
+  .controls-panel {
+    order: 1;
     width: 100%;
     height: auto;
-    aspect-ratio: 4/3;
+    max-height: none;
+    overflow: visible;
+    border-right: none;
+    border-top: 1px solid var(--border-color);
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  }
+
+  .controls-panel .status-group {
+    margin-top: 0;
+  }
+
+  .output-header {
+    height: auto;
+    min-height: 40px;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .output-header h2 {
+    font-size: 1.15rem;
+    font-weight: 500;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .view-tabs {
+    flex-shrink: 0;
+  }
+
+  .view-tab {
+    padding: 6px 14px;
+    font-size: 0.85rem;
+  }
+
+  /* The viewport sizes to its content. `!important` overrides the
+     inline `height: 100%` used by the text task templates. */
+  .viewport {
+    flex: none;
+    height: auto !important;
+    min-height: 0;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  .view-content.active {
+    flex: none;
+    min-height: 0;
+  }
+
+  .cam-container,
+  .viewport:not(.audio-viewport) .upload-dropzone {
+    flex: none;
+    height: auto;
+  }
+
+  /* Webcam box follows the real stream aspect ratio (set as
+     --video-aspect by trackVideoAspect) so portrait phone cameras
+     are not squeezed into a tiny 4:3 pillarbox. */
+  .video-wrapper {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: var(--video-aspect, 4 / 3);
+    max-height: 60vh;
+    max-height: 60dvh;
+  }
+
+  video,
+  .video-wrapper canvas,
+  .webcam-capture,
+  .webcam-overlay {
+    width: 100%;
+    height: 100%;
+  }
+
+  .webcam-placeholder {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: auto;
+  }
+
+  .viewport:not(.audio-viewport) .preview-container {
+    flex: none;
+    width: 100%;
+    height: min(100vw, 55vh);
+    height: min(100vw, 55dvh);
+  }
+
+  /* Let the image shrink to fit on both axes so its box matches the
+     rendered pixels exactly and the overlay canvas stays aligned. */
+  .viewport:not(.audio-viewport) .preview-container img,
+  .viewport:not(.audio-viewport) .preview-container .canvas-wrapper img {
+    width: auto;
+    height: auto;
+    max-width: 100cqw;
+    max-height: 100cqh;
+  }
+
+  .dropzone-content {
+    padding: 28px 16px;
+  }
+
+  .large-icon {
+    font-size: 48px;
+  }
+
+  /* --- Touch ergonomics --- */
+  /* Form controls under 16px make iOS Safari zoom the page on focus. */
+  select,
+  textarea,
+  input[type='text'],
+  input[type='number'] {
+    font-size: 16px !important;
+  }
+
+  .range-slider {
+    box-sizing: content-box;
+    height: 6px;
+    padding: 12px 0;
+    background-clip: content-box;
+  }
+
+  .range-slider::-webkit-slider-thumb {
+    width: 24px;
+    height: 24px;
+  }
+
+  .action-button,
+  .tab-button,
+  .view-tab {
+    min-height: 40px;
+  }
+
+  .score-container {
+    width: 120px;
+  }
+}
+
+/* Hover effects that shift layout feel broken on touch screens where
+   :hover sticks after a tap. */
+@media (hover: none) {
+  .nav-button:hover {
+    padding-left: 16px;
+  }
+
+  .nav-button.active:hover {
+    padding-left: 13px;
+  }
+
+  .classification-row:hover {
+    transform: none;
   }
 }
 

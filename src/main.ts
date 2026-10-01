@@ -41,9 +41,10 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 app.innerHTML = `
   <div class="app-container">
     <aside class="sidebar"></aside>
+    <div class="sidebar-backdrop" aria-hidden="true"></div>
     <div class="mobile-header">
-       <button class="menu-toggle material-icons" style="margin-right: 12px; color: var(--text-secondary); background: none; border: none; font-size: 24px; cursor: pointer;">menu</button>
-       <div id="mobile-nav-container" style="display: flex; align-items: center; flex-grow: 1;"></div>
+       <button class="menu-toggle material-icons" aria-label="Open navigation" style="margin-right: 12px; color: var(--text-secondary); background: none; border: none; font-size: 24px; cursor: pointer;">menu</button>
+       <div id="mobile-nav-container" style="display: flex; align-items: center; flex-grow: 1; min-width: 0;"></div>
     </div>
     <main class="main-content">
       <div id="docs-banner-container"></div>
@@ -62,18 +63,32 @@ renderMobileNav(mobileNavContainer);
 const bannerContainer = app.querySelector('#docs-banner-container') as HTMLElement;
 renderBanner(bannerContainer);
 
-// 3. Setup Navigation Logic
+// 3. Setup Navigation Logic (off-canvas drawer on small screens)
+const sidebarBackdrop = app.querySelector('.sidebar-backdrop') as HTMLElement;
+
+function setSidebarOpen(open: boolean) {
+  sidebar.classList.toggle('open', open);
+  sidebarBackdrop.classList.toggle('visible', open);
+  document.body.classList.toggle('sidebar-open', open);
+}
+
 const menuToggles = app.querySelectorAll('.menu-toggle');
 menuToggles.forEach((toggle) => {
   toggle.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
+    setSidebarOpen(!sidebar.classList.contains('open'));
   });
+});
+
+sidebarBackdrop.addEventListener('click', () => setSidebarOpen(false));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && sidebar.classList.contains('open')) setSidebarOpen(false);
 });
 
 // Close sidebar when a link is clicked
 sidebar.addEventListener('click', (e) => {
   if ((e.target as HTMLElement).closest('a')) {
-    sidebar.classList.remove('open');
+    setSidebarOpen(false);
   }
 });
 

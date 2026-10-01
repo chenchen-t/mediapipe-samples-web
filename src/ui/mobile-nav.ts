@@ -43,35 +43,8 @@ export function renderMobileNav(container: HTMLElement) {
   // Sync select with current hash
   const updateSelect = () => {
     const hash = window.location.hash || '#/vision/object_detector';
-    if (hash.includes('interactive_segmenter')) {
-      select.value = '#/vision/interactive_segmenter';
-    } else if (hash.includes('image_segmenter')) {
-      select.value = '#/vision/image_segmenter';
-    } else if (hash.includes('face_landmarker')) {
-      select.value = '#/vision/face_landmarker';
-    } else if (hash.includes('hand_landmarker')) {
-      select.value = '#/vision/hand_landmarker';
-    } else if (hash.includes('pose_landmarker')) {
-      select.value = '#/vision/pose_landmarker';
-    } else if (hash.includes('holistic_landmarker')) {
-      select.value = '#/vision/holistic_landmarker';
-    } else if (hash.includes('image_classifier')) {
-      select.value = '#/vision/image_classifier';
-    } else if (hash.includes('gesture_recognizer')) {
-      select.value = '#/vision/gesture_recognizer';
-    } else if (hash.includes('face_detector')) {
-      select.value = '#/vision/face_detector';
-    } else if (hash.includes('audio_classifier')) {
-      select.value = '#/audio/audio_classifier';
-    } else if (hash.includes('text_classifier')) {
-      select.value = '#/text/text_classifier';
-    } else if (hash.includes('text_embedder')) {
-      select.value = '#/text/text_embedder';
-    } else if (hash.includes('language_detector')) {
-      select.value = '#/text/language_detector';
-    } else {
-      select.value = '#/vision/object_detector';
-    }
+    const hasOption = Array.from(select.options).some((o) => o.value === hash);
+    select.value = hasOption ? hash : '#/vision/object_detector';
   };
 
   updateSelect();

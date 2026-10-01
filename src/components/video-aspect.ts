@@ -18,6 +18,9 @@
  * Publishes the intrinsic aspect ratio of a webcam stream as the
  * `--video-aspect` CSS custom property on the video's `.video-wrapper`.
  *
+ * The value is a plain number (width / height) so the stylesheet can use
+ * it both in `aspect-ratio` and inside `calc()` to derive a width.
+ *
  * Phone cameras deliver portrait streams in portrait orientation; the
  * mobile stylesheet uses this variable to size the preview box to the
  * stream instead of forcing a 4:3 landscape pillarbox.
@@ -28,7 +31,7 @@ export function trackVideoAspect(video: HTMLVideoElement) {
 
   const apply = () => {
     if (video.videoWidth > 0 && video.videoHeight > 0) {
-      wrapper.style.setProperty('--video-aspect', `${video.videoWidth} / ${video.videoHeight}`);
+      wrapper.style.setProperty('--video-aspect', (video.videoWidth / video.videoHeight).toFixed(4));
     }
   };
 

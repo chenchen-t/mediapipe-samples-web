@@ -15,6 +15,7 @@
  */
 
 import { ViewToggle } from './view-toggle';
+import { trackVideoAspect, clearVideoAspect } from './video-aspect';
 
 export interface MediaManagerOptions {
   containerId?: string; // e.g. 'view-mode-toggle' parent or just the default one
@@ -187,6 +188,7 @@ export class MediaManager {
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       this.video.srcObject = stream;
+      trackVideoAspect(this.video);
       document.getElementById('webcam-placeholder')?.classList.add('hidden');
 
       const playAndPredict = () => {
@@ -221,6 +223,7 @@ export class MediaManager {
       const stream = this.video.srcObject as MediaStream;
       stream.getTracks().forEach((t) => t.stop());
       this.video.srcObject = null;
+      clearVideoAspect(this.video);
       document.getElementById('webcam-placeholder')?.classList.remove('hidden');
       if (this.enableWebcamButton) this.enableWebcamButton.innerText = 'Enable Webcam';
       if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);

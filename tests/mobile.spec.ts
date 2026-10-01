@@ -68,45 +68,100 @@ test.describe('Mobile Layout & Navigation', () => {
     await expect(page.locator('.output-header h2')).toHaveText('Object Detection');
   });
 
-  test('should stack controls vertically on mobile', async ({ page }) => {
+  test('should stack panels vertically with the demo above settings', async ({ page }) => {
     await page.goto('/#/vision/image_segmenter');
 
     // .task-container should be column flex direction
     const taskContainer = page.locator('.task-container');
     await expect(taskContainer).toHaveCSS('flex-direction', 'column');
 
-    // Controls panel should be full width (or close to it)
     const controlsPanel = page.locator('.controls-panel');
     const controlsBox = await controlsPanel.boundingBox();
-    
-    // Output should be below controls
+
     const outputPanel = page.locator('.output-panel');
     const outputBox = await outputPanel.boundingBox();
 
+    expect(controlsBox).not.toBeNull();
+    expect(outputBox).not.toBeNull();
     if (controlsBox && outputBox) {
-      expect(outputBox.y).toBeGreaterThan(controlsBox.y);
-      // Width should be roughly viewport width (minus padding)
-      expect(controlsBox.width).toBeGreaterThan(300); // 375 viewport
+      // On a phone the demo comes first; settings follow below it.
+      expect(controlsBox.y).toBeGreaterThan(outputBox.y);
+      // Both span the viewport width.
+      expect(controlsBox.width).toBeGreaterThan(300);
+      expect(outputBox.width).toBeGreaterThan(300);
     }
+
+    // Settings must not be clipped by an inner scroll container.
+    await expect(controlsPanel).toHaveCSS('overflow-y', 'visible');
+    const lastControl = page.locator('.controls-panel .status-group');
+    await lastControl.scrollIntoViewIfNeeded();
+    await expect(lastControl).toBeVisible();
+  });
+
+  test('should not overflow horizontally on any task', async ({ page }) => {
+    for (const route of [
+      '/vision/object_detector',
+      '/vision/image_embedder',
+      '/audio/audio_classifier',
+      '/text/text_classifier',
+      '/text/text_embedder',
+    ]) {
+      await page.goto(`/#${route}`);
+      await page.waitForSelector('.output-panel');
+      const { scrollWidth, innerWidth } = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+      }));
+      expect(scrollWidth, `horizontal overflow on ${route}`).toBeLessThanOrEqual(innerWidth);
+    }
+  });
+
+  test('should open the nav drawer and close it via the backdrop', async ({ page }) => {
+    const sidebar = page.locator('.sidebar');
+    const backdrop = page.locator('.sidebar-backdrop');
+
+    await page.click('.mobile-header .menu-toggle');
+    await expect(sidebar).toBeVisible();
+    await expect(backdrop).toBeVisible();
+    await expect(sidebar).toHaveCSS('position', 'fixed');
+
+    // Tap outside the drawer (backdrop) to dismiss.
+    await backdrop.click({ position: { x: 370, y: 400 } });
+    await expect(sidebar).toBeHidden();
+    await expect(backdrop).toBeHidden();
+
+    // Navigating via a drawer link also closes it.
+    await page.click('.mobile-header .menu-toggle');
+    await page.click('.sidebar a[href="#/vision/face_detector"]');
+    await expect(page).toHaveURL(/face_detector/);
+    await expect(sidebar).toBeHidden();
+  });
+
+  test('should keep the task dropdown in sync for every route', async ({ page }) => {
+    const select = page.locator('#mobile-task-select');
+    await page.goto('/#/vision/image_embedder');
+    await expect(select).toHaveValue('#/vision/image_embedder');
+    await page.goto('/#/text/language_detector');
+    await expect(select).toHaveValue('#/text/language_detector');
   });
 
   test('should show enable webcam button nicely centered', async ({ page }) => {
     await page.goto('/#/vision/image_segmenter');
-    
+
     // Wait for model to load
     await expect(page.locator('#status-message')).toHaveText(/(Ready)|(Done)/, { timeout: 30000 });
 
     // Switch to Webcam tab
     await page.click('#view-mode-toggle button[data-value="video"]');
-    
+
     const btn = page.locator('#webcamButton');
     await expect(btn).toBeVisible();
     // Webcam auto-starts on tab switch in this app version
     await expect(btn).toHaveText(/(Enable Webcam)|(Disable Webcam)/);
 
     // Verify centering styles are applied
-    const initialTransform = await btn.evaluate(el => getComputedStyle(el).transform);
-    const parentBox = await btn.evaluate(el => el.parentElement?.getBoundingClientRect());
+    const initialTransform = await btn.evaluate((el) => getComputedStyle(el).transform);
+    const parentBox = await btn.evaluate((el) => el.parentElement?.getBoundingClientRect());
     const btnBox = await btn.boundingBox();
     console.log('Webcam button transform:', initialTransform);
     console.log('Parent box:', parentBox);

@@ -20,31 +20,14 @@
  * fully editable; edits are kept per question type.
  */
 
+import textTemplate from '../templates/decision-maker-text.html?raw';
 import { ViewToggle } from '../components/view-toggle';
+import { parseDecisionRequest, toRequestJson, type Draft, type QuestionKind } from './decision-maker-json';
 
-export type QuestionKind = 'boolean' | 'choice' | 'score';
+export type { QuestionKind };
 
 /** Runs one evaluation in the worker; resolves with the raw task result. */
 export type Evaluator = (kind: QuestionKind, text: string, question: object) => Promise<any>;
-
-interface Item {
-  label: string;
-  description: string;
-}
-
-interface Draft {
-  input: string;
-  condition: string;
-  /** Boolean only: what "true" / "false" mean (sent as `options`). Optional. */
-  trueDescription: string;
-  falseDescription: string;
-  /** Optional domain context prepended to the question. */
-  context: string;
-  /** Boolean only: P(true) needed to answer Yes. */
-  threshold: number;
-  items: Item[];
-  instructions: string;
-}
 
 /** Fields not used by a question type. */
 const EMPTY: Omit<Draft, 'input'> = {
@@ -135,127 +118,12 @@ interface Outcome {
   bars: Bar[];
 }
 
-export const textTemplate = `
-<div class="dt-root">
-  <div id="dt-kind-toggle" style="margin-bottom: 12px"></div>
-
-  <div class="dt-card">
-    <div class="dt-input-header">
-      <label class="dt-label" for="dt-input">Input text</label>
-      <div id="dt-samples" class="dt-samples"></div>
-    </div>
-    <textarea id="dt-input" class="dt-field" rows="3"></textarea>
-
-    <div id="dt-boolean-fields">
-      <label class="dt-label" for="dt-condition">Condition</label>
-      <textarea id="dt-condition" class="dt-field" rows="2"></textarea>
-
-      <div class="dt-two-col">
-        <div>
-          <label class="dt-label" for="dt-true-desc">Yes means <span class="dt-optional">optional</span></label>
-          <textarea id="dt-true-desc" class="dt-field" rows="2" placeholder="${DEFAULT_TRUE}"></textarea>
-        </div>
-        <div>
-          <label class="dt-label" for="dt-false-desc">No means <span class="dt-optional">optional</span></label>
-          <textarea id="dt-false-desc" class="dt-field" rows="2" placeholder="${DEFAULT_FALSE}"></textarea>
-        </div>
-      </div>
-
-      <label class="dt-label" for="dt-threshold">
-        Threshold <span class="dt-optional">answer Yes when P(yes) ≥ <b id="dt-threshold-value">0.50</b></span>
-      </label>
-      <input id="dt-threshold" type="range" min="0.05" max="0.95" step="0.05" value="0.5" class="range-slider" />
-    </div>
-
-    <div id="dt-list-fields">
-      <label class="dt-label" for="dt-instructions">Instructions</label>
-      <input id="dt-instructions" class="dt-field" type="text" />
-      <div class="dt-label" id="dt-items-title">Options</div>
-      <div id="dt-items"></div>
-      <button id="dt-add-item" class="dt-link-btn">
-        <span class="material-icons">add</span><span id="dt-add-label">Add option</span>
-      </button>
-    </div>
-
-    <label class="dt-label" for="dt-context">Context <span class="dt-optional">optional</span></label>
-    <input id="dt-context" class="dt-field" type="text" placeholder="e.g. Screening emails sent to a company inbox." />
-
-    <div class="dt-actions">
-      <button id="dt-reset" class="dt-link-btn">Restore sample</button>
-      <button id="dt-evaluate" class="dt-action-btn" disabled>
-        <span class="material-icons">psychology</span> Evaluate
-      </button>
-    </div>
-  </div>
-
-  <div class="dt-card">
-    <div class="dt-label">Result</div>
-    <div id="dt-headline" class="dt-headline dt-muted">-</div>
-    <div id="dt-subtitle" class="dt-subtitle"></div>
-    <div id="dt-bars"></div>
-  </div>
-
-  <style>
-    .dt-root { width: 100%; max-width: 800px; }
-    .dt-card {
-      border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-      padding: 16px; margin-bottom: 12px; background: var(--surface);
-    }
-    .dt-label {
-      display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
-      font-weight: 600; color: var(--text-secondary); margin: 12px 0 6px;
-    }
-    .dt-input-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .dt-input-header .dt-label { margin-top: 0; }
-    .dt-samples { display: flex; gap: 6px; flex-wrap: wrap; }
-    .dt-sample {
-      border: 1px solid var(--border-color); background: transparent; border-radius: 16px;
-      padding: 4px 12px; font-size: 0.75rem; color: var(--text-secondary); cursor: pointer;
-    }
-    .dt-sample:hover { color: var(--primary); border-color: var(--primary); }
-    .dt-sample.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-    .dt-optional { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 4px; }
-    .dt-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 600px) { .dt-two-col { grid-template-columns: 1fr; } }
-    .dt-field {
-      width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-sm);
-      border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);
-      font-family: 'Roboto', sans-serif; font-size: 0.9rem; resize: vertical;
-    }
-    .dt-field:focus { outline: none; border-color: var(--primary); }
-    .dt-item { display: grid; grid-template-columns: 30% 1fr 32px; gap: 8px; margin-bottom: 8px; }
-    .dt-icon-btn {
-      border: none; background: none; cursor: pointer; color: var(--text-secondary);
-      display: flex; align-items: center; justify-content: center; border-radius: 50%;
-    }
-    .dt-icon-btn:hover { background: #f1f3f4; color: var(--text-main); }
-    .dt-link-btn {
-      display: inline-flex; align-items: center; gap: 4px; border: none; background: none;
-      color: var(--primary); font-size: 0.85rem; font-weight: 500; cursor: pointer; padding: 4px 0;
-    }
-    .dt-link-btn .material-icons { font-size: 18px; }
-    .dt-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
-    .dt-action-btn {
-      display: flex; align-items: center; gap: 8px; background: var(--primary); color: #fff;
-      border: none; border-radius: var(--radius-sm); padding: 10px 24px; font-size: 0.9rem;
-      font-weight: 500; cursor: pointer;
-    }
-    .dt-action-btn .material-icons { font-size: 18px; }
-    .dt-action-btn:hover:not(:disabled) { background: var(--primary-hover); }
-    .dt-action-btn:disabled { background: var(--border-color); cursor: not-allowed; }
-    .dt-headline { font-size: 1.6rem; font-weight: 500; color: var(--text-main); }
-    .dt-muted { color: var(--text-secondary); }
-    .dt-subtitle { font-size: 0.9rem; color: var(--text-secondary); margin: 2px 0 8px; min-height: 1em; }
-    .dt-bar { display: grid; grid-template-columns: 35% 1fr 56px; align-items: center; gap: 12px; padding: 4px 0; }
-    .dt-bar-label { font-size: 0.85rem; color: var(--text-main); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .dt-bar.hl .dt-bar-label { font-weight: 600; }
-    .dt-bar-track { height: 8px; background: #f1f3f4; border-radius: 4px; overflow: hidden; }
-    .dt-bar-fill { height: 100%; background: #bdc1c6; border-radius: 4px; transition: width 0.3s; }
-    .dt-bar.hl .dt-bar-fill { background: var(--primary); }
-    .dt-bar-value { font-family: 'Roboto Mono', monospace; font-size: 0.8rem; text-align: right; color: var(--text-main); }
-  </style>
-</div>
-`;
+/** One-line explanation of each question type, shown under the tabs. */
+const KIND_HELP: Record<QuestionKind, string> = {
+  boolean: 'Boolean: is the condition true for the input text? The model answers Yes or No, with a probability.',
+  choice: 'Choice: which option fits the input text best? The model picks one option and scores all of them.',
+  score: 'Score: where does the input text fall on a scale? The model picks a level from your rubric.',
+};
 
 export class DecisionTextPlayground {
   private kind: QuestionKind = 'boolean';
@@ -268,6 +136,7 @@ export class DecisionTextPlayground {
   private ready = false;
   private busy = false;
   private el: Record<string, HTMLElement> = {};
+  private kindToggle!: ViewToggle;
 
   constructor(
     private root: HTMLElement,
@@ -278,8 +147,10 @@ export class DecisionTextPlayground {
   init() {
     this.root.innerHTML = textTemplate;
     this.root.querySelectorAll<HTMLElement>('[id]').forEach((node) => (this.el[node.id] = node));
+    (this.el['dt-true-desc'] as HTMLTextAreaElement).placeholder = DEFAULT_TRUE;
+    (this.el['dt-false-desc'] as HTMLTextAreaElement).placeholder = DEFAULT_FALSE;
 
-    new ViewToggle(
+    this.kindToggle = new ViewToggle(
       'dt-kind-toggle',
       [
         { label: 'Boolean', value: 'boolean', icon: 'rule' },
@@ -307,6 +178,7 @@ export class DecisionTextPlayground {
       this.el['dt-threshold-value'].textContent = parseFloat((e.target as HTMLInputElement).value).toFixed(2);
     });
 
+    this.initJsonDialog();
     this.showDraft();
   }
 
@@ -332,8 +204,13 @@ export class DecisionTextPlayground {
     (this.el['dt-instructions'] as HTMLInputElement).value = d.instructions;
     this.el['dt-boolean-fields'].style.display = isBoolean ? '' : 'none';
     this.el['dt-list-fields'].style.display = isBoolean ? 'none' : '';
-    this.el['dt-items-title'].textContent = this.kind === 'score' ? 'Rubric (lowest to highest)' : 'Options';
+    this.el['dt-items-title'].textContent = this.kind === 'score' ? 'Rubric' : 'Options';
+    this.el['dt-items-hint'].textContent =
+      this.kind === 'score'
+        ? 'levels from lowest to highest, each with a short description'
+        : 'the answers to pick from, each with a short description';
     this.el['dt-add-label'].textContent = this.kind === 'score' ? 'Add level' : 'Add option';
+    this.el['dt-kind-help'].textContent = KIND_HELP[this.kind];
     this.renderItems();
     this.renderSamples();
   }
@@ -402,6 +279,55 @@ export class DecisionTextPlayground {
   }
 
   // ---------------------------------------------------------------------------
+  // Open JSON: paste a Decision API request instead of filling in the form
+  // ---------------------------------------------------------------------------
+
+  private initJsonDialog() {
+    const dialog = this.el['dt-json-dialog'] as HTMLDialogElement;
+    const textarea = this.el['dt-json-text'] as HTMLTextAreaElement;
+    const error = this.el['dt-json-error'];
+
+    this.el['dt-open-json'].addEventListener('click', () => {
+      // Prefill with the request for the current form so the format is self-explanatory.
+      this.saveDraft();
+      const d = this.drafts[this.kind];
+      textarea.value = toRequestJson(this.kind, d.input.trim(), this.buildQuestion(d).question);
+      error.textContent = '';
+      dialog.showModal();
+      textarea.focus();
+      textarea.setSelectionRange(0, 0);
+      textarea.scrollTop = 0;
+    });
+    this.el['dt-json-cancel'].addEventListener('click', () => dialog.close());
+
+    const load = (andRun: boolean) => {
+      try {
+        const { kind, draft, note } = parseDecisionRequest(textarea.value, EMPTY);
+        this.drafts[kind] = draft;
+        if (kind !== this.kind) {
+          this.kindToggle.setActive(kind); // switches tab, shows the new draft
+        } else {
+          this.showDraft();
+          this.clearResult();
+        }
+        dialog.close();
+        if (andRun && this.ready && !this.busy) {
+          // Show the note after the run so "Evaluating..." doesn't hide it.
+          this.run().then((ok) => ok && note && this.onStatus(note));
+        } else if (andRun) {
+          this.onStatus(note ? `${note} The model is not ready yet.` : 'Loaded. The model is not ready yet.');
+        } else if (note) {
+          this.onStatus(note);
+        }
+      } catch (e: any) {
+        error.textContent = e?.message ?? String(e);
+      }
+    };
+    this.el['dt-json-load'].addEventListener('click', () => load(false));
+    this.el['dt-json-run'].addEventListener('click', () => load(true));
+  }
+
+  // ---------------------------------------------------------------------------
   // Evaluation
   // ---------------------------------------------------------------------------
 
@@ -437,12 +363,19 @@ export class DecisionTextPlayground {
     return { question: { rubric, instructions: d.instructions.trim(), ...context } };
   }
 
-  private async run() {
+  /** Evaluates the current form; resolves true if a result was shown. */
+  private async run(): Promise<boolean> {
     this.saveDraft();
     const d = this.drafts[this.kind];
-    if (!d.input.trim()) return this.onStatus('Enter some input text.');
+    if (!d.input.trim()) {
+      this.onStatus('Enter some input text.');
+      return false;
+    }
     const { question, error } = this.buildQuestion(d);
-    if (error) return this.onStatus(error);
+    if (error) {
+      this.onStatus(error);
+      return false;
+    }
 
     this.busy = true;
     this.updateButton();
@@ -452,8 +385,10 @@ export class DecisionTextPlayground {
       if (msg.type !== 'DECIDE_RESULT') throw new Error(msg.error);
       this.showOutcome(this.format(msg.result, d));
       this.onStatus('Done', msg.inferenceTime);
+      return true;
     } catch (e: any) {
       this.onStatus(`Error: ${e?.message ?? e}`);
+      return false;
     } finally {
       this.busy = false;
       this.updateButton();

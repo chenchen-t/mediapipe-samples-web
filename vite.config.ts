@@ -58,12 +58,24 @@ function localModelsPlugin(modelsDir: string | undefined): Plugin {
   return {
     name: 'local-models-plugin',
     configureServer(server) {
-      if (!modelsDir) return;
       server.middlewares.use((req, res, next) => {
         const match = req.url?.split('?')[0].match(/\/local-models\/([^/]+)$/);
         if (!match) return next();
-        const filePath = path.join(modelsDir, decodeURIComponent(match[1]));
-        if (!fs.existsSync(filePath)) return next();
+        let name = '';
+        try {
+          name = decodeURIComponent(match[1]);
+        } catch {
+          // Malformed escape: treated as not found below.
+        }
+        // Only plain file names directly inside LOCAL_MODELS_DIR (no "..%2F" tricks).
+        const filePath = modelsDir && name && path.basename(name) === name ? path.join(modelsDir, name) : '';
+        // Never fall through to the SPA's index.html: the page would try to load HTML as a model.
+        if (!filePath || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'text/plain');
+          res.end(modelsDir ? `Not found in LOCAL_MODELS_DIR: ${match[1]}` : 'LOCAL_MODELS_DIR is not set');
+          return;
+        }
         res.setHeader('Content-Type', 'application/octet-stream');
         res.setHeader('Content-Length', fs.statSync(filePath).size);
         res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');

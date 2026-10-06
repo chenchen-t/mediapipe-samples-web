@@ -27,6 +27,8 @@
  * inspect each decision.
  */
 
+import template from '../templates/decision-maker.html?raw';
+import { InferenceTimer } from '../components/inference-timer';
 import { ModelSelector, type ModelSelection } from '../components/model-selector';
 import { ViewToggle } from '../components/view-toggle';
 import { DecisionTextPlayground, type QuestionKind } from './decision-maker-text';
@@ -72,9 +74,16 @@ const DUCK_LEAD_TICKS = 6;
 /** Flying obstacles: between ducking height and standing head height. */
 const BIRD_BOTTOM = 18;
 
-/** Local models served by the dev server from LOCAL_MODELS_DIR (see vite.config.ts). */
-const MODELS: Record<string, { label: string; file: string; unsupported?: boolean }> = {
-  laya_s256: { label: 'Laya S256', file: 'laya_s256.task' },
+/**
+ * Built-in models. `url` models are downloaded directly; the others are served
+ * by the dev server from LOCAL_MODELS_DIR (see vite.config.ts).
+ */
+const MODELS: Record<string, { label: string; file: string; url?: string; unsupported?: boolean }> = {
+  laya_s256: {
+    label: 'Laya S256',
+    file: 'laya_s256.task',
+    url: 'https://storage.googleapis.com/mediapipe-models/decision_maker/laya/float32/laya_s256/latest/laya_s256.task',
+  },
   embeddinggemma2_270m: {
     label: 'EmbeddingGemma 270M (not supported yet)',
     file: 'embeddinggemma2_270m.litertlm',
@@ -431,178 +440,8 @@ function drawGround(ctx: CanvasRenderingContext2D, scroll: number) {
 }
 
 // ---------------------------------------------------------------------------
-// UI
+// Page
 // ---------------------------------------------------------------------------
-
-const optionsHtml = DINO_QUESTION.options.map((o) => `<li><b>${o.label}</b> — ${o.description}</li>`).join('');
-
-const probRowsHtml = ACTIONS.map(
-  (a) => `
-  <div class="dm-prob">
-    <span class="dm-label dm-prob-label">${a.toLowerCase()}</span>
-    <div class="dm-prob-bar"><div id="dm-prob-${a}" class="dm-prob-fill"></div></div>
-    <span id="dm-prob-value-${a}" class="dm-prob-value">-</span>
-  </div>`
-).join('');
-
-const template = `
-<div class="task-container">
-  <div class="controls-panel">
-    <div class="section-title">Model Selection</div>
-    <div id="model-selector-container"></div>
-
-    <div class="divider"></div>
-
-    <div class="dm-game-only">
-    <div class="section-title">Controls</div>
-    <div class="dm-buttons">
-      <button id="dm-play" class="dm-btn dm-btn-primary">
-        <span class="material-icons">play_arrow</span><span class="dm-btn-label">Play</span>
-      </button>
-      <button id="dm-step" class="dm-btn" title="Advance one tick (→)">
-        <span class="material-icons">skip_next</span><span>Next Step</span>
-      </button>
-      <button id="dm-reset" class="dm-btn" title="Restart (R)">
-        <span class="material-icons">replay</span><span>Reset</span>
-      </button>
-    </div>
-    <p class="dm-hint">Shortcuts: <b>Space</b> play/pause, <b>→</b> next step, <b>R</b> reset</p>
-
-    <div class="divider"></div>
-    </div>
-
-    <div class="section-title">Settings</div>
-    <div class="control-group dm-game-only">
-      <div class="control-label">
-        <span>Simulation Speed</span>
-        <span id="dm-speed-value" class="value-badge">1x</span>
-      </div>
-      <input type="range" id="dm-speed" min="0.25" max="2" step="0.25" value="1" class="range-slider" />
-    </div>
-
-    <div class="control-group dm-game-only">
-      <label class="dm-checkbox">
-        <input type="checkbox" id="dm-pause-on-decision" checked />
-        <span>Pause when the model picks JUMP or DUCK</span>
-      </label>
-    </div>
-
-    <div class="control-group">
-      <div class="control-label">
-        <span>Delegate</span>
-      </div>
-      <div class="select-wrapper">
-        <select id="delegate-select">
-          <option value="GPU" selected>GPU</option>
-          <option value="CPU">CPU</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="status-group">
-      <div id="status-message" class="status-message">Initializing...</div>
-      <div id="inference-time" class="inference-time">Inference Time: - ms</div>
-    </div>
-  </div>
-
-  <div class="output-panel">
-    <div class="output-header">
-      <h2>Decision Maker</h2>
-      <div id="view-mode-toggle"></div>
-    </div>
-    <div class="viewport">
-      <div id="dm-text-view" class="dm-view"></div>
-      <div id="dm-game-view" class="dm-view">
-      <canvas id="dm-canvas" class="dm-canvas"></canvas>
-
-      <div class="dm-panels">
-        <div class="dm-card dm-decision">
-          <div id="dm-action" class="dm-action">WAIT</div>
-          <div id="dm-reason" class="dm-reason">Press Play or Next Step.</div>
-          <div class="dm-probs">${probRowsHtml}</div>
-        </div>
-
-        <div class="dm-stats">
-          <div class="dm-stat"><span class="dm-label">Tick</span><span id="dm-obs-tick">0</span></div>
-          <div class="dm-stat"><span class="dm-label">Speed</span><span id="dm-obs-speed">-</span></div>
-          <div class="dm-stat"><span class="dm-label">Cleared</span><span id="dm-obs-cleared">0</span></div>
-          <div class="dm-stat"><span class="dm-label">Model calls</span><span id="dm-obs-calls">0</span></div>
-        </div>
-
-        <div class="dm-card">
-          <div class="dm-label">Model input</div>
-          <div id="dm-prompt" class="dm-prompt">(model not called yet)</div>
-          <div class="dm-question">
-            <span class="dm-label">Choice</span> ${DINO_QUESTION.instructions}
-            <ul class="dm-options">${optionsHtml}</ul>
-          </div>
-        </div>
-      </div>
-      </div>
-    </div>
-  </div>
-
-  <style>
-    .dm-view { width: 100%; display: flex; flex-direction: column; align-items: center; }
-    .dm-buttons { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
-    .dm-btn {
-      display: flex; align-items: center; justify-content: center; gap: 6px;
-      padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);
-      background: var(--surface); color: var(--text-main); font-size: 0.9rem; font-weight: 500;
-      cursor: pointer; transition: background 0.2s;
-    }
-    .dm-btn .material-icons { font-size: 20px; }
-    .dm-btn:hover:not(:disabled) { background: #f1f3f4; }
-    .dm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .dm-btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-    .dm-btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
-    .dm-hint { font-size: 0.75rem; color: var(--text-secondary); margin: 0 0 20px; }
-    .dm-checkbox { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; margin-bottom: 8px; }
-    .dm-canvas {
-      width: 100%; max-width: ${WIDTH}px; aspect-ratio: ${WIDTH} / ${HEIGHT};
-      border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: #fff;
-    }
-    .dm-panels {
-      display: flex; flex-direction: column; gap: 12px;
-      width: 100%; max-width: ${WIDTH}px; margin-top: 12px;
-    }
-    .dm-card { border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 12px 16px; }
-    .dm-label {
-      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;
-      font-weight: 600; color: var(--text-secondary);
-    }
-    .dm-decision { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .dm-action {
-      min-width: 72px; text-align: center; padding: 6px 16px; border-radius: 16px; font-weight: 700;
-      font-family: 'Roboto Mono', monospace; background: #f1f3f4; color: var(--text-secondary);
-    }
-    .dm-action.jump, .dm-action.duck { background: var(--primary); color: #fff; }
-    .dm-action.crash { background: #d93025; color: #fff; }
-    .dm-reason { flex: 1; min-width: 180px; font-size: 0.9rem; color: var(--text-main); }
-    .dm-probs { display: flex; flex-direction: column; gap: 4px; width: 220px; }
-    .dm-prob { display: flex; align-items: center; gap: 8px; }
-    .dm-prob-label { width: 36px; }
-    .dm-prob-bar { flex: 1; height: 8px; background: #f1f3f4; border-radius: 4px; overflow: hidden; }
-    .dm-prob-fill { height: 100%; width: 0; background: var(--primary); transition: width 0.15s; }
-    .dm-prob-value { font-family: 'Roboto Mono', monospace; font-size: 0.8rem; width: 36px; text-align: right; }
-    .dm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-    .dm-stat {
-      display: flex; flex-direction: column; gap: 4px; padding: 10px 16px;
-      border: 1px solid var(--border-color); border-radius: var(--radius-sm);
-    }
-    .dm-stat span:last-child { font-family: 'Roboto Mono', monospace; font-size: 0.95rem; color: var(--text-main); }
-    @media (max-width: 600px) { .dm-stats { grid-template-columns: repeat(2, 1fr); } }
-    .dm-question { margin-top: 8px; font-size: 0.85rem; color: var(--text-main); }
-    .dm-options { margin: 4px 0 0; padding-left: 20px; color: var(--text-secondary); }
-    .dm-prompt {
-      font-family: 'Roboto Mono', monospace; font-size: 0.8rem; line-height: 1.5;
-      background: #f8f9fa; padding: 8px; border-radius: 6px; color: var(--text-main); margin-top: 6px;
-    }
-  </style>
-</div>
-`;
 
 class DecisionMakerTask {
   private world = createWorld();
@@ -623,6 +462,8 @@ class DecisionMakerTask {
 
   private running = false;
   private busy = false;
+  /** Shared "Inference Time" badge + history graph, same as the other tasks. */
+  private inferenceTimer = new InferenceTimer();
   /** Bumped on reset/model change so stale async answers are ignored. */
   private epoch = 0;
   private inFlight = false;
@@ -639,6 +480,12 @@ class DecisionMakerTask {
   init() {
     this.container.innerHTML = template;
     this.container.querySelectorAll<HTMLElement>('[id]').forEach((node) => (this.el[node.id] = node));
+    this.container.style.setProperty('--dm-width', `${WIDTH}px`);
+    this.container.style.setProperty('--dm-aspect', `${WIDTH} / ${HEIGHT}`);
+    this.el['dm-question-text'].textContent = DINO_QUESTION.instructions;
+    this.el['dm-options'].innerHTML = DINO_QUESTION.options
+      .map((o) => `<li><b>${o.label}</b> — ${o.description}</li>`)
+      .join('');
 
     const canvas = this.el['dm-canvas'] as HTMLCanvasElement;
     const dpr = window.devicePixelRatio || 1;
@@ -661,9 +508,9 @@ class DecisionMakerTask {
       this.el['dm-text-view'],
       (kind, text, question) => this.askModel(text, kind, question),
       (text, inferenceTime) => {
-        this.el['status-message'].textContent = text;
-        if (inferenceTime !== undefined)
-          this.el['inference-time'].textContent = `Inference Time: ${inferenceTime.toFixed(1)} ms`;
+        if (inferenceTime === undefined) return this.setStatus(text);
+        this.inferenceTimer.record(inferenceTime, this.delegate);
+        this.setStatus(`Done in ${Math.round(inferenceTime)}ms`);
       }
     );
     this.textPlayground.init();
@@ -697,6 +544,13 @@ class DecisionMakerTask {
       const option = this.container.querySelector<HTMLOptionElement>(`.model-select option[value="${value}"]`);
       if (option) option.disabled = true;
     }
+    // Decision models also ship as .litertlm (e.g. EmbeddingGemma), so allow those for upload.
+    const upload = this.container.querySelector<HTMLInputElement>('.model-upload');
+    if (upload) {
+      upload.accept = '.task,.tflite,.litertlm';
+      const label = upload.parentElement?.firstChild;
+      if (label?.nodeType === Node.TEXT_NODE) label.textContent = 'Choose .task / .tflite / .litertlm File';
+    }
     this.el['delegate-select'].addEventListener('change', (e) => {
       this.delegate = (e.target as HTMLSelectElement).value as 'GPU' | 'CPU';
       this.loadModel();
@@ -705,12 +559,14 @@ class DecisionMakerTask {
 
     this.render();
     this.updatePanel();
+    this.inferenceTimer.mount();
     this.loadModel();
   }
 
   cleanup() {
     this.running = false;
     window.removeEventListener('keydown', this.onKeyDown);
+    this.inferenceTimer.cleanup();
     this.worker?.terminate();
     this.worker = undefined;
   }
@@ -719,31 +575,55 @@ class DecisionMakerTask {
   // Model (runs in a worker)
   // -------------------------------------------------------------------------
 
-  private loadModel() {
+  private async loadModel() {
     this.setRunning(false);
     this.worker?.terminate();
+    this.worker = undefined;
     this.modelReady = false;
     this.textPlayground.setReady(false);
+    this.inferenceTimer.resetRollingWindow();
     // Settle calls to the old worker so awaiting code (and the busy flag) unwinds.
     for (const resolve of this.resolvers.values()) resolve({ type: 'ERROR', error: 'Model reloaded' });
     this.resolvers.clear();
-    this.epoch++;
+    const epoch = ++this.epoch;
     this.inFlight = false;
     this.setStatus(`Loading ${this.customModel?.name ?? MODELS[this.modelName].file}...`);
 
+    const baseUrl = import.meta.env.BASE_URL;
+    const model = MODELS[this.modelName];
+    const localUrl = new URL(`local-models/${model.file}`, new URL(baseUrl, window.location.origin)).href;
+    const modelUrl = this.customModel ? undefined : (model.url ?? localUrl);
+    if (model.url && !this.customModel) this.setStatus(`Downloading ${model.file} (first load may take a while)...`);
+
+    // Local models are served from LOCAL_MODELS_DIR by the dev server. Check
+    // it's there first; otherwise the wasm gets an error page instead of a model.
+    if (modelUrl === localUrl && !(await this.isModelAvailable(modelUrl))) {
+      if (epoch !== this.epoch) return;
+      this.setStatus(
+        `Error: ${model.file} not found. Upload a model, or set LOCAL_MODELS_DIR in .env.local and restart the dev server.`
+      );
+      return;
+    }
+    if (epoch !== this.epoch) return;
+
     this.worker = new Worker(new URL('../workers/decision-maker.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (event) => this.onWorkerMessage(event.data);
-
-    const baseUrl = import.meta.env.BASE_URL;
     this.worker.postMessage({
       type: 'INIT',
-      modelAssetPath: this.customModel
-        ? undefined
-        : new URL(`local-models/${MODELS[this.modelName].file}`, new URL(baseUrl, window.location.origin)).href,
+      modelAssetPath: modelUrl,
       modelFile: this.customModel,
       delegate: this.delegate,
       baseUrl,
     });
+  }
+
+  private async isModelAvailable(url: string): Promise<boolean> {
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      return res.ok && !(res.headers.get('Content-Type') ?? '').includes('text/html');
+    } catch {
+      return false;
+    }
   }
 
   private onWorkerMessage(msg: any) {
@@ -811,7 +691,7 @@ class DecisionMakerTask {
       selectedKey: string;
       probabilities: Record<string, number>;
     };
-    this.el['inference-time'].textContent = `Inference Time: ${msg.inferenceTime.toFixed(1)} ms`;
+    this.inferenceTimer.record(msg.inferenceTime, this.delegate);
     const action = (selectedKey?.toUpperCase() as Action) ?? 'WAIT';
     const probs = Object.fromEntries(ACTIONS.map((a) => [a, probabilities?.[a.toLowerCase()] ?? 0])) as Record<
       Action,
@@ -957,6 +837,7 @@ class DecisionMakerTask {
 
   private setStatus(text: string) {
     this.el['status-message'].textContent = text;
+    this.inferenceTimer.syncStatusVisibility(text);
     this.updateButtons();
   }
 

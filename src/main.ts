@@ -30,6 +30,7 @@ import { setupImageEmbedder, cleanupImageEmbedder } from './tasks/image-embedder
 import { setupInteractiveSegmenter, cleanupInteractiveSegmenter } from './tasks/interactive-segmenter';
 import { setupHolisticLandmarker, cleanupHolisticLandmarker } from './tasks/holistic-landmarker';
 import { setupImageClassifier, cleanupImageClassifier } from './tasks/image-classifier';
+import { setupDecisionMaker, cleanupDecisionMaker } from './tasks/decision-maker';
 
 import { renderSidebar } from './ui/sidebar';
 import { renderMobileNav } from './ui/mobile-nav';
@@ -147,6 +148,7 @@ const routes = {
     label: 'Language Detector',
   },
   '/text/text_embedder': { setup: setupTextEmbedder, cleanup: cleanupTextEmbedder, label: 'Text Embedder' },
+  '/decision/decision_maker': { setup: setupDecisionMaker, cleanup: cleanupDecisionMaker, label: 'Decision Maker' },
 };
 
 let currentCleanup: (() => void) | undefined;

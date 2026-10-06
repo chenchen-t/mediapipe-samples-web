@@ -35,6 +35,7 @@ export function renderMobileNav(container: HTMLElement) {
         <option value="#/text/text_classifier">Text Classification</option>
         <option value="#/text/language_detector">Language Detection</option>
         <option value="#/text/text_embedder">Text Embedding</option>
+        <option value="#/decision/decision_maker">Decision Maker</option>
       </select>
   `;
 

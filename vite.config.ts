@@ -1,4 +1,4 @@
-import { createLogger, defineConfig, type Plugin } from 'vite';
+import { createLogger, defineConfig, loadEnv, type Plugin } from 'vite';
 import fs from 'node:fs';
 import path from 'node:path';
 import { copyWasmFiles } from './copy-wasm.js';
@@ -49,20 +49,48 @@ function mediapipeWasmPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
+/**
+ * Dev-only: serves large local model files (e.g. Decision Maker .task/.litertlm)
+ * from LOCAL_MODELS_DIR at <base>/local-models/<file>. Set LOCAL_MODELS_DIR in
+ * .env.local or the environment.
+ */
+function localModelsPlugin(modelsDir: string | undefined): Plugin {
+  return {
+    name: 'local-models-plugin',
+    configureServer(server) {
+      if (!modelsDir) return;
+      server.middlewares.use((req, res, next) => {
+        const match = req.url?.split('?')[0].match(/\/local-models\/([^/]+)$/);
+        if (!match) return next();
+        const filePath = path.join(modelsDir, decodeURIComponent(match[1]));
+        if (!fs.existsSync(filePath)) return next();
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Length', fs.statSync(filePath).size);
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        fs.createReadStream(filePath).pipe(res);
+      });
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   base: '/mediapipe-samples-web/',
   customLogger,
 
-  plugins: [mediapipeWasmPlugin()],
+  plugins: [
+    mediapipeWasmPlugin(),
+    localModelsPlugin(process.env.LOCAL_MODELS_DIR || loadEnv(mode, process.cwd(), '').LOCAL_MODELS_DIR),
+  ],
   optimizeDeps: {
     exclude: [
       '@mediapipe/tasks-vision',
       '@mediapipe/tasks-audio',
-      '@mediapipe/tasks-text'
-    ]
+      '@mediapipe/tasks-text',
+      '@mediapipe/tasks-decision',
+    ],
   },
   worker: {
-    format: 'es'
+    format: 'es',
   },
   build: {
     sourcemap: false,
@@ -81,15 +109,15 @@ export default defineConfig({
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Resource-Policy': 'cross-origin'
-    }
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
   },
   preview: {
     port: 5174,
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
-      'Cross-Origin-Resource-Policy': 'cross-origin'
-    }
-  }
-});
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    },
+  },
+}));

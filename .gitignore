@@ -14,3 +14,6 @@ tests/__snapshots__/
 # Temporary test scripts
 test-init.js
 test-worker.js
+
+# Local env (e.g. LOCAL_MODELS_DIR)
+.env.local

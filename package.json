@@ -15,9 +15,10 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@mediapipe/tasks-audio": "^1.0.1",
-    "@mediapipe/tasks-text": "^1.0.1",
-    "@mediapipe/tasks-vision": "^1.0.1",
+    "@mediapipe/tasks-audio": "1.1.0-rc.20261005",
+    "@mediapipe/tasks-decision": "1.1.0-rc.20261005",
+    "@mediapipe/tasks-text": "1.1.0-rc.20261005",
+    "@mediapipe/tasks-vision": "1.1.0-rc.20261005",
     "mediapipe-od-ts": "link:"
   },
   "devDependencies": {

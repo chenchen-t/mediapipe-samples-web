@@ -79,17 +79,43 @@ const BIRD_BOTTOM = 18;
  * by the dev server from LOCAL_MODELS_DIR (see vite.config.ts).
  */
 const MODELS: Record<string, { label: string; file: string; url?: string; unsupported?: boolean }> = {
+  embeddinggemma2_270m: {
+    label: 'EmbeddingGemma-2 Text 270M',
+    file: 'embeddinggemma-2-text-270m.litertlm',
+    url: 'https://huggingface.co/litert-community/embeddinggemma-2-text-270m-litert-lm',
+  },
   laya_s256: {
     label: 'Laya S256',
     file: 'laya_s256.task',
     url: 'https://storage.googleapis.com/mediapipe-models/decision_maker/laya/float32/laya_s256/latest/laya_s256.task',
   },
-  embeddinggemma2_270m: {
-    label: 'EmbeddingGemma 270M (not supported yet)',
-    file: 'embeddinggemma2_270m.litertlm',
-    unsupported: true,
-  },
 };
+
+/**
+ * Resolves model page URLs (e.g. Hugging Face repository or tree URLs) to their
+ * direct binary download endpoints suitable for HTTP fetching and streaming.
+ */
+export function resolveModelDownloadUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  const hfRepoMatch = trimmed.match(
+    /^https?:\/\/huggingface\.co\/([^/]+)\/([^/]+)(?:\/(?:tree|blob|resolve)\/([^/]+)(?:\/(.+))?)?$/
+  );
+  if (hfRepoMatch) {
+    const [, org, repo, branchOrType, filePath] = hfRepoMatch;
+    // 1. Direct download endpoint already specified
+    if (branchOrType === 'resolve' && filePath) {
+      return trimmed;
+    }
+    // 2. Look up the specific model filename for known repository versions
+    const matched = Object.values(MODELS).find((m) => m.url?.includes(`${org}/${repo}`));
+    const fileName = filePath || (matched ? matched.file : `${repo}.litertlm`);
+    // 3. Preserve custom git branch/tag/revision if specified, otherwise default to 'main'
+    const branch = branchOrType && branchOrType !== 'tree' && branchOrType !== 'blob' ? branchOrType : 'main';
+    return `https://huggingface.co/${org}/${repo}/resolve/${branch}/${fileName}`;
+  }
+  // Passthrough for non-Hugging Face URLs (GCS, local dev server, direct CDNs)
+  return trimmed;
+}
 
 /**
  * The Choice question asked about the scene text. This wording was picked
@@ -449,7 +475,7 @@ class DecisionMakerTask {
   /** The model's current decision about what's ahead; performed by the game when timing is right. */
   private plan: Decision = { action: 'WAIT', reason: 'Press Play or Next Step.', target: null };
 
-  private modelName = 'laya_s256';
+  private modelName = 'embeddinggemma2_270m';
   /** Set when the user uploads a model file instead of picking a standard one. */
   private customModel: File | undefined;
   private delegate: 'GPU' | 'CPU' = 'GPU';
@@ -592,7 +618,7 @@ class DecisionMakerTask {
     const baseUrl = import.meta.env.BASE_URL;
     const model = MODELS[this.modelName];
     const localUrl = new URL(`local-models/${model.file}`, new URL(baseUrl, window.location.origin)).href;
-    const modelUrl = this.customModel ? undefined : (model.url ?? localUrl);
+    const modelUrl = this.customModel ? undefined : model.url ? resolveModelDownloadUrl(model.url) : localUrl;
     if (model.url && !this.customModel) this.setStatus(`Downloading ${model.file} (first load may take a while)...`);
 
     // Local models are served from LOCAL_MODELS_DIR by the dev server. Check

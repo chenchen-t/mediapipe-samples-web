@@ -24,6 +24,29 @@ export function renderSidebar(container: HTMLElement) {
       </div>
     </div>
     <nav class="sidebar-nav">
+      <div class="category-header">Audio</div>
+      <ul>
+        <li><a href="#/audio/audio_classifier" class="nav-button" data-task="audio-classifier">Audio Classifier</a></li>
+      </ul>
+
+      <div class="category-header">Decision</div>
+      <ul>
+        <li><a href="#/decision/decision_maker" class="nav-button" data-task="decision-maker">Decision Maker</a></li>
+      </ul>
+
+      <div class="category-header">Retrieval</div>
+      <ul>
+        <li><a href="#/retrieval/semantic_retriever" class="nav-button" data-task="semantic-retriever">Semantic Retriever</a></li>
+        <li><a href="#/retrieval/universal_embedder" class="nav-button" data-task="universal-embedder">Universal Embedder</a></li>
+      </ul>
+
+      <div class="category-header">Text</div>
+      <ul>
+        <li><a href="#/text/language_detector" class="nav-button" data-task="language-detector">Language Detector</a></li>
+        <li><a href="#/text/text_classifier" class="nav-button" data-task="text-classifier">Text Classifier</a></li>
+        <li><a href="#/text/text_embedder" class="nav-button" data-task="text-embedder">Text Embedder</a></li>
+      </ul>
+
       <div class="category-header">Vision</div>
       <ul>
         <li><a href="#/vision/face_detector" class="nav-button" data-task="face-detector">Face Detector</a></li>
@@ -37,28 +60,6 @@ export function renderSidebar(container: HTMLElement) {
         <li><a href="#/vision/interactive_segmenter" class="nav-button" data-task="interactive-segmenter">Interactive Segmenter</a></li>
         <li><a href="#/vision/object_detector" class="nav-button" data-task="object-detector">Object Detector</a></li>
         <li><a href="#/vision/pose_landmarker" class="nav-button" data-task="pose-landmarker">Pose Landmarker</a></li>
-      </ul>
-
-      <div class="category-header">Audio</div>
-      <ul>
-        <li><a href="#/audio/audio_classifier" class="nav-button" data-task="audio-classifier">Audio Classifier</a></li>
-      </ul>
-
-      <div class="category-header">Text</div>
-      <ul>
-        <li><a href="#/text/language_detector" class="nav-button" data-task="language-detector">Language Detector</a></li>
-        <li><a href="#/text/text_classifier" class="nav-button" data-task="text-classifier">Text Classifier</a></li>
-        <li><a href="#/text/text_embedder" class="nav-button" data-task="text-embedder">Text Embedder</a></li>
-      </ul>
-
-      <div class="category-header">Decision</div>
-      <ul>
-        <li><a href="#/decision/decision_maker" class="nav-button" data-task="decision-maker">Decision Maker</a></li>
-      </ul>
-      <div class="category-header">Retrieval</div>
-      <ul>
-        <li><a href="#/retrieval/universal_embedder" class="nav-button" data-task="universal-embedder">Universal Embedder</a></li>
-        <li><a href="#/retrieval/semantic_retriever" class="nav-button" data-task="semantic-retriever">Semantic Retriever</a></li>
       </ul>
     </nav>
     <div class="sidebar-footer">

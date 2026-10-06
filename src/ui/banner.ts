@@ -245,6 +245,19 @@ export const TASK_BANNER_LINKS: Record<string, TaskBannerLinks> = {
     stackblitzUrl:
       'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Ftext-embedder.ts',
   },
+  '/decision/decision_maker': {
+    label: 'Decision Maker',
+    docsUrl: MEDIAPIPE_DOCS_OVERVIEW_URL,
+    sampleCodeUrl: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/decision-maker.ts',
+    samples: {
+      web: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/decision-maker.ts',
+      android: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/decision/android',
+      ios: MEDIAPIPE_DOCS_OVERVIEW_URL,
+      python: MEDIAPIPE_DOCS_OVERVIEW_URL,
+    },
+    stackblitzUrl:
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fdecision-maker.ts',
+  },
   '/retrieval/universal_embedder': {
     label: 'Universal Embedder',
     docsUrl: 'https://developers.google.com/edge/mediapipe/solutions/retrieval/universal_embedder/web_js',

@@ -9,14 +9,17 @@ importers:
   .:
     dependencies:
       '@mediapipe/tasks-audio':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: 1.1.0-rc.20261005
+        version: 1.1.0-rc.20261005
+      '@mediapipe/tasks-decision':
+        specifier: 1.1.0-rc.20261005
+        version: 1.1.0-rc.20261005
       '@mediapipe/tasks-text':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: 1.1.0-rc.20261005
+        version: 1.1.0-rc.20261005
       '@mediapipe/tasks-vision':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: 1.1.0-rc.20261005
+        version: 1.1.0-rc.20261005
       mediapipe-od-ts:
         specifier: 'link:'
         version: 'link:'
@@ -207,14 +210,17 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@mediapipe/tasks-audio@1.0.1':
-    resolution: {integrity: sha512-znfNNj9p6sAfsmrK+mjpW5H2NdWEcyvebjIcxjM3onv5God5S//fT4wFZ76quYL9J9SSTi2EkdUCq2zjYbzK2w==}
+  '@mediapipe/tasks-audio@1.1.0-rc.20261005':
+    resolution: {integrity: sha512-ncFi5WALOjhs8wYseOvmNhss87UnF5xJIVzKxz9K0+lzhDCZx9JeoDEyd/smL6xubCZBWJC1P1+kCnh7Bph+2w==}
 
-  '@mediapipe/tasks-text@1.0.1':
-    resolution: {integrity: sha512-03cqJx+BZ+WpmuDqq+4Z8Bn7BdJyEPxU7Q1iuczjrh3YGiaAD2VMYf5JCLd+vQy7nNrlOOvUQlTnX0nYRpAUOA==}
+  '@mediapipe/tasks-decision@1.1.0-rc.20261005':
+    resolution: {integrity: sha512-9nuDOc3iSormOHRm4g8XkDVM7iCzOtLN+O59Fb0e4Lsqc/ix7Bfl7ImIzMUmDeWYiiUM/NpnVhVF96ew04K3zw==}
 
-  '@mediapipe/tasks-vision@1.0.1':
-    resolution: {integrity: sha512-rvRE2FmAZ6ZxKSw7wq+e+jQDpN3t1B/tD2mJz9SmAzb1msoDkd4dMoE4wAh8Z30Um0PQwLiHr9QtomhmXk3aUQ==}
+  '@mediapipe/tasks-text@1.1.0-rc.20261005':
+    resolution: {integrity: sha512-hUsC1M7pS/oZpZphsEIwcryPXWe8CgRMRx2wEED3a/ZA417wYJwinnTLn1ioBXt5xQoHgY/LjtmgVFLpyCW0ug==}
+
+  '@mediapipe/tasks-vision@1.1.0-rc.20261005':
+    resolution: {integrity: sha512-VkrQQ0McZ7BM0r1JL0l5ra1EFw04Dm9ln5Ki5iCzZVZAeVEKDzTPgo3Y/8dRmeqq8Mjg6496dXFZTgkRpB5YyA==}
 
   '@oxc-project/types@0.151.0':
     resolution: {integrity: sha512-J1yXrIlNDZVzE3ada310xeAw7nH8yCAyLPuUIsjKatFPmfn5bS1oW+cM+QsGOtVWd5nhSpbwZWx/rue+r5Z+PA==}
@@ -759,11 +765,13 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@mediapipe/tasks-audio@1.0.1': {}
+  '@mediapipe/tasks-audio@1.1.0-rc.20261005': {}
 
-  '@mediapipe/tasks-text@1.0.1': {}
+  '@mediapipe/tasks-decision@1.1.0-rc.20261005': {}
 
-  '@mediapipe/tasks-vision@1.0.1': {}
+  '@mediapipe/tasks-text@1.1.0-rc.20261005': {}
+
+  '@mediapipe/tasks-vision@1.1.0-rc.20261005': {}
 
   '@oxc-project/types@0.151.0': {}
 

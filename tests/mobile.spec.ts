@@ -66,6 +66,16 @@ test.describe('Mobile Layout & Navigation', () => {
     await select.selectOption('#/vision/object_detector');
     await expect(page).toHaveURL(/.*object_detector/);
     await expect(page.locator('.output-header h2')).toHaveText('Object Detection');
+
+    // Select Universal Embedder
+    await select.selectOption('#/retrieval/universal_embedder');
+    await expect(page).toHaveURL(/.*universal_embedder/);
+    await expect(page.locator('.output-header h2')).toHaveText('Universal Embedder');
+
+    // Select Semantic Retriever
+    await select.selectOption('#/retrieval/semantic_retriever');
+    await expect(page).toHaveURL(/.*semantic_retriever/);
+    await expect(page.locator('.output-header h2')).toHaveText('Semantic Retriever');
   });
 
   test('should stack panels vertically with the demo above settings', async ({ page }) => {
@@ -77,7 +87,7 @@ test.describe('Mobile Layout & Navigation', () => {
 
     const controlsPanel = page.locator('.controls-panel');
     const controlsBox = await controlsPanel.boundingBox();
-
+    
     const outputPanel = page.locator('.output-panel');
     const outputBox = await outputPanel.boundingBox();
 
@@ -105,6 +115,8 @@ test.describe('Mobile Layout & Navigation', () => {
       '/audio/audio_classifier',
       '/text/text_classifier',
       '/text/text_embedder',
+      '/retrieval/universal_embedder',
+      '/retrieval/semantic_retriever',
     ]) {
       await page.goto(`/#${route}`);
       await page.waitForSelector('.output-panel');
@@ -147,13 +159,13 @@ test.describe('Mobile Layout & Navigation', () => {
 
   test('should show enable webcam button nicely centered', async ({ page }) => {
     await page.goto('/#/vision/image_segmenter');
-
+    
     // Wait for model to load
     await expect(page.locator('#status-message')).toHaveText(/(Ready)|(Done)/, { timeout: 30000 });
 
     // Switch to Webcam tab
     await page.click('#view-mode-toggle button[data-value="video"]');
-
+    
     const btn = page.locator('#webcamButton');
     await expect(btn).toBeVisible();
     // Webcam auto-starts on tab switch in this app version

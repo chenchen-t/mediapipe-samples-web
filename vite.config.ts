@@ -56,10 +56,11 @@ export default defineConfig({
   plugins: [mediapipeWasmPlugin()],
   optimizeDeps: {
     exclude: [
+      '@mediapipe/tasks-retrieval',
       '@mediapipe/tasks-vision',
       '@mediapipe/tasks-audio',
-      '@mediapipe/tasks-text'
-    ]
+      '@mediapipe/tasks-text',
+    ],
   },
   worker: {
     format: 'es'

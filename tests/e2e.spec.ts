@@ -36,6 +36,16 @@ test.describe('Navigation & UI', () => {
     await expect(page).toHaveURL(/.*#\/vision\/image_segmenter/);
     await expect(page.locator('h2')).toContainText('Image Segmentation');
 
+    await page.click('a[data-task="universal-embedder"]');
+    await expect(page).toHaveURL(/.*#\/retrieval\/universal_embedder/);
+    await expect(page.locator('.sidebar-nav .active')).toHaveAttribute('data-task', 'universal-embedder');
+    await expect(page.locator('h2')).toContainText('Universal Embedder');
+
+    await page.click('a[data-task="semantic-retriever"]');
+    await expect(page).toHaveURL(/.*#\/retrieval\/semantic_retriever/);
+    await expect(page.locator('.sidebar-nav .active')).toHaveAttribute('data-task', 'semantic-retriever');
+    await expect(page.locator('h2')).toContainText('Semantic Retriever');
+
     await page.click('a[data-task="object-detector"]');
     await expect(page).toHaveURL(/.*#\/vision\/object_detector/);
     await expect(page.locator('h2')).toContainText('Object Detection');
@@ -144,6 +154,62 @@ test.describe('Navigation & UI', () => {
     await expect(stackblitzLink).toHaveAttribute(
       'href',
       'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fimage-segmenter.ts'
+    );
+
+    // Navigate to Universal Embedder and verify banner links
+    await page.click('a[data-task="universal-embedder"]');
+    await expect(taskDocsLink).toContainText('Universal Embedder Guide');
+    await expect(taskDocsLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/retrieval/universal_embedder/web_js'
+    );
+    await expect(webSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/universal-embedder.ts'
+    );
+    await expect(androidSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/android'
+    );
+    await expect(iosSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/ios'
+    );
+    await expect(pythonSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/python'
+    );
+    await expect(stackblitzLink).toHaveAttribute(
+      'href',
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Funiversal-embedder.ts'
+    );
+
+    // Navigate to Semantic Retriever and verify banner links
+    await page.click('a[data-task="semantic-retriever"]');
+    await expect(taskDocsLink).toContainText('Semantic Retriever Guide');
+    await expect(taskDocsLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/retrieval/semantic_retriever/web_js'
+    );
+    await expect(webSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/semantic-retriever.ts'
+    );
+    await expect(androidSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/android'
+    );
+    await expect(iosSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/ios'
+    );
+    await expect(pythonSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/python'
+    );
+    await expect(stackblitzLink).toHaveAttribute(
+      'href',
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fsemantic-retriever.ts'
     );
   });
 });

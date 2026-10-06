@@ -18,7 +18,8 @@ import './inference-timer.css';
 
 export interface InferenceSample {
   time: number;
-  delegate: 'CPU' | 'GPU';
+  delegate?: 'CPU' | 'GPU';
+  timeB?: number;
 }
 
 interface CumulativeStats {
@@ -26,7 +27,22 @@ interface CumulativeStats {
   gpuCount: number;
   cpuSum: number;
   cpuCount: number;
+  seriesASum: number;
+  seriesACount: number;
+  seriesBSum: number;
+  seriesBCount: number;
   history: InferenceSample[];
+}
+
+export type InferenceTimerMode = 'delegate' | 'dual' | 'single';
+
+export interface InferenceTimerOptions {
+  rollingWindowSize?: number;
+  maxHistorySize?: number;
+  textUpdateIntervalMs?: number;
+  mode?: InferenceTimerMode;
+  labelA?: string;
+  labelB?: string;
 }
 
 const GPU_COLOR = '#007f8b';
@@ -46,6 +62,10 @@ function getRouteStats(): CumulativeStats {
       gpuCount: 0,
       cpuSum: 0,
       cpuCount: 0,
+      seriesASum: 0,
+      seriesACount: 0,
+      seriesBSum: 0,
+      seriesBCount: 0,
       history: [],
     };
     sessionStatsByRoute.set(key, stats);
@@ -57,6 +77,9 @@ export class InferenceTimer {
   private readonly rollingWindowSize: number;
   private readonly maxHistorySize: number;
   private readonly textUpdateIntervalMs: number;
+  private readonly mode: InferenceTimerMode;
+  private readonly labelA: string;
+  private readonly labelB: string;
 
   private rollingSamples: number[] = [];
   private lastTextUpdateMs = 0;
@@ -67,11 +90,30 @@ export class InferenceTimer {
   private valueBadgeEl: HTMLElement | null = null;
   private gpuAvgEl: HTMLElement | null = null;
   private cpuAvgEl: HTMLElement | null = null;
+  private seriesAAvgEl: HTMLElement | null = null;
+  private seriesBAvgEl: HTMLElement | null = null;
 
-  constructor(rollingWindowSize = 10, maxHistorySize = 50, textUpdateIntervalMs = 180) {
-    this.rollingWindowSize = rollingWindowSize;
-    this.maxHistorySize = maxHistorySize;
-    this.textUpdateIntervalMs = textUpdateIntervalMs;
+  constructor(
+    optionsOrWindowSize: number | InferenceTimerOptions = 10,
+    maxHistorySize = 50,
+    textUpdateIntervalMs = 180
+  ) {
+    if (typeof optionsOrWindowSize === 'object' && optionsOrWindowSize !== null) {
+      this.rollingWindowSize = optionsOrWindowSize.rollingWindowSize ?? 10;
+      this.maxHistorySize = optionsOrWindowSize.maxHistorySize ?? 50;
+      this.textUpdateIntervalMs = optionsOrWindowSize.textUpdateIntervalMs ?? 180;
+      this.mode = optionsOrWindowSize.mode ?? 'delegate';
+      this.labelA =
+        optionsOrWindowSize.labelA ?? (this.mode === 'dual' ? 'A' : this.mode === 'single' ? 'Query' : 'GPU');
+      this.labelB = optionsOrWindowSize.labelB ?? (this.mode === 'dual' ? 'B' : 'CPU');
+    } else {
+      this.rollingWindowSize = optionsOrWindowSize;
+      this.maxHistorySize = maxHistorySize;
+      this.textUpdateIntervalMs = textUpdateIntervalMs;
+      this.mode = 'delegate';
+      this.labelA = 'GPU';
+      this.labelB = 'CPU';
+    }
   }
 
   public mount() {
@@ -84,8 +126,15 @@ export class InferenceTimer {
     }
 
     const stats = getRouteStats();
-    const lastTime = stats.history.length > 0 ? stats.history[stats.history.length - 1].time : null;
-    const initialBadgeText = lastTime !== null ? `${lastTime.toFixed(2)} ms` : '- ms';
+    const lastSample = stats.history.length > 0 ? stats.history[stats.history.length - 1] : null;
+    let initialBadgeText = '- ms';
+    if (lastSample) {
+      if (this.mode === 'dual' && lastSample.timeB !== undefined) {
+        initialBadgeText = `${(lastSample.time + lastSample.timeB).toFixed(2)} ms`;
+      } else {
+        initialBadgeText = `${lastSample.time.toFixed(2)} ms`;
+      }
+    }
 
     const inferenceTimeEl = document.getElementById('inference-time');
     if (inferenceTimeEl) {
@@ -103,19 +152,45 @@ export class InferenceTimer {
       container = document.createElement('div');
       container.id = 'inference-history-container';
       container.className = 'inference-history-body';
+
+      let legendHtml = '';
+      if (this.mode === 'dual') {
+        legendHtml = `
+          <span class="inference-delegate-stat">
+            <span class="inference-legend-dot gpu"></span>
+            ${this.labelA}: <strong id="inference-series-a-avg">--</strong>
+          </span>
+          <span class="inference-delegate-stat">
+            <span class="inference-legend-dot cpu"></span>
+            ${this.labelB}: <strong id="inference-series-b-avg">--</strong>
+          </span>
+        `;
+      } else if (this.mode === 'single') {
+        legendHtml = `
+          <span class="inference-delegate-stat">
+            <span class="inference-legend-dot gpu"></span>
+            ${this.labelA}: <strong id="inference-series-a-avg">--</strong>
+          </span>
+        `;
+      } else {
+        legendHtml = `
+          <span class="inference-delegate-stat">
+            <span class="inference-legend-dot gpu"></span>
+            ${this.labelA}: <strong id="inference-gpu-avg">--</strong>
+          </span>
+          <span class="inference-delegate-stat">
+            <span class="inference-legend-dot cpu"></span>
+            ${this.labelB}: <strong id="inference-cpu-avg">--</strong>
+          </span>
+        `;
+      }
+
       container.innerHTML = `
         <div class="inference-graph-wrapper">
           <canvas id="inference-history-canvas" class="inference-history-canvas"></canvas>
         </div>
         <div class="inference-delegate-summary">
-          <span class="inference-delegate-stat">
-            <span class="inference-legend-dot gpu"></span>
-            GPU: <strong id="inference-gpu-avg">--</strong>
-          </span>
-          <span class="inference-delegate-stat">
-            <span class="inference-legend-dot cpu"></span>
-            CPU: <strong id="inference-cpu-avg">--</strong>
-          </span>
+          ${legendHtml}
         </div>
       `;
 
@@ -125,6 +200,8 @@ export class InferenceTimer {
     this.canvas = container.querySelector('#inference-history-canvas') as HTMLCanvasElement | null;
     this.gpuAvgEl = container.querySelector('#inference-gpu-avg') as HTMLElement | null;
     this.cpuAvgEl = container.querySelector('#inference-cpu-avg') as HTMLElement | null;
+    this.seriesAAvgEl = container.querySelector('#inference-series-a-avg') as HTMLElement | null;
+    this.seriesBAvgEl = container.querySelector('#inference-series-b-avg') as HTMLElement | null;
 
     this.drawGraph();
     this.updateDelegateSummaries();
@@ -134,7 +211,7 @@ export class InferenceTimer {
    * Keeps #status-message accessible in the DOM for tests/screen-readers while showing
    * loading/error states in the Inference Time badge until inference time is available.
    */
-  public syncStatusVisibility(msg: string) {
+  public syncStatusVisibility(msg: string, state?: string) {
     const statusEl = document.getElementById('status-message');
 
     if (!this.valueBadgeEl || !this.valueBadgeEl.isConnected) {
@@ -142,9 +219,14 @@ export class InferenceTimer {
     }
     if (!this.valueBadgeEl) return;
 
-    const isError = /^error\b/i.test(msg.trim()) || msg.toLowerCase().includes('failed');
-    const isDoneOrReady =
-      msg.startsWith('Done') || msg === 'Ready' || msg === 'Webcam running...' || msg.includes('Ready');
+    const isError = state === 'error' || /^error\b/i.test(msg.trim()) || msg.toLowerCase().includes('failed');
+    const isIdleOrReady =
+      state === 'idle' ||
+      state === 'ready' ||
+      msg.startsWith('Done') ||
+      msg === 'Ready' ||
+      msg === 'Webcam running...' ||
+      /ready/i.test(msg);
 
     if (isError) {
       if (statusEl) {
@@ -162,13 +244,23 @@ export class InferenceTimer {
     }
     this.valueBadgeEl.classList.remove('error');
 
-    if (!isDoneOrReady) {
+    if (!isIdleOrReady) {
       this.valueBadgeEl.textContent = msg.length > 24 ? `${msg.slice(0, 22)}…` : msg;
     } else if (this.lastDisplayedAvg > 0) {
       this.valueBadgeEl.textContent = `${this.lastDisplayedAvg.toFixed(2)} ms`;
-    } else if (msg.includes('Ready') && this.valueBadgeEl.textContent === 'Loading Model...') {
+    } else {
       this.valueBadgeEl.textContent = '- ms';
     }
+  }
+
+  public setStatus(stateOrMsg: string, message?: string) {
+    const msg = message !== undefined ? message : stateOrMsg;
+    const state = message !== undefined ? stateOrMsg : undefined;
+    const statusEl = document.getElementById('status-message');
+    if (statusEl) {
+      statusEl.textContent = msg;
+    }
+    this.syncStatusVisibility(msg, state);
   }
 
   /**
@@ -184,8 +276,115 @@ export class InferenceTimer {
     }
   }
 
-  public record(time: number, delegate: 'CPU' | 'GPU'): number {
+  public recordDual(timeA: number, timeB: number): number {
+    if (!Number.isFinite(timeA) || timeA < 0 || !Number.isFinite(timeB) || timeB < 0) {
+      return this.lastDisplayedAvg;
+    }
+
+    const stats = getRouteStats();
+    stats.seriesASum += timeA;
+    stats.seriesACount += 1;
+    stats.seriesBSum += timeB;
+    stats.seriesBCount += 1;
+
+    const total = timeA + timeB;
+    this.rollingSamples.push(total);
+    if (this.rollingSamples.length > this.rollingWindowSize) {
+      this.rollingSamples.shift();
+    }
+
+    stats.history.push({ time: timeA, timeB: timeB });
+    if (stats.history.length > this.maxHistorySize) {
+      stats.history.shift();
+    }
+
+    const avg = this.computeRollingAverage();
+    const now = performance.now();
+
+    if (this.rollingSamples.length === 1 || now - this.lastTextUpdateMs >= this.textUpdateIntervalMs) {
+      this.applyTextUpdate(avg);
+      this.lastTextUpdateMs = now;
+    } else if (this.pendingUpdateTimer === undefined) {
+      const remaining = this.textUpdateIntervalMs - (now - this.lastTextUpdateMs);
+      this.pendingUpdateTimer = window.setTimeout(
+        () => {
+          this.pendingUpdateTimer = undefined;
+          this.applyTextUpdate(this.computeRollingAverage());
+          this.lastTextUpdateMs = performance.now();
+        },
+        Math.max(16, remaining)
+      );
+    }
+
+    if (!this.canvas || !this.canvas.isConnected) {
+      this.mount();
+    } else {
+      this.drawGraph();
+      this.updateDelegateSummaries();
+    }
+
+    return this.lastDisplayedAvg;
+  }
+
+  public recordSingle(time: number): number {
     if (!Number.isFinite(time) || time < 0) {
+      return this.lastDisplayedAvg;
+    }
+
+    const stats = getRouteStats();
+    stats.seriesASum += time;
+    stats.seriesACount += 1;
+
+    this.rollingSamples.push(time);
+    if (this.rollingSamples.length > this.rollingWindowSize) {
+      this.rollingSamples.shift();
+    }
+
+    stats.history.push({ time });
+    if (stats.history.length > this.maxHistorySize) {
+      stats.history.shift();
+    }
+
+    const avg = this.computeRollingAverage();
+    const now = performance.now();
+
+    if (this.rollingSamples.length === 1 || now - this.lastTextUpdateMs >= this.textUpdateIntervalMs) {
+      this.applyTextUpdate(avg);
+      this.lastTextUpdateMs = now;
+    } else if (this.pendingUpdateTimer === undefined) {
+      const remaining = this.textUpdateIntervalMs - (now - this.lastTextUpdateMs);
+      this.pendingUpdateTimer = window.setTimeout(
+        () => {
+          this.pendingUpdateTimer = undefined;
+          this.applyTextUpdate(this.computeRollingAverage());
+          this.lastTextUpdateMs = performance.now();
+        },
+        Math.max(16, remaining)
+      );
+    }
+
+    if (!this.canvas || !this.canvas.isConnected) {
+      this.mount();
+    } else {
+      this.drawGraph();
+      this.updateDelegateSummaries();
+    }
+
+    return this.lastDisplayedAvg;
+  }
+
+  public record(time: number, delegate: 'CPU' | 'GPU'): number;
+  public record(timeA: number, timeB: number): number;
+  public record(timeOrA: number, delegateOrB: 'CPU' | 'GPU' | number = 'GPU'): number {
+    if (this.mode === 'dual' && typeof delegateOrB === 'number') {
+      return this.recordDual(timeOrA, delegateOrB);
+    }
+    if (this.mode === 'single') {
+      return this.recordSingle(timeOrA);
+    }
+
+    const delegate = delegateOrB === 'CPU' || delegateOrB === 'GPU' ? delegateOrB : 'GPU';
+    if (!Number.isFinite(timeOrA) || timeOrA < 0) {
       return this.lastDisplayedAvg;
     }
 
@@ -196,20 +395,20 @@ export class InferenceTimer {
       this.lastTextUpdateMs = 0;
     }
 
-    this.rollingSamples.push(time);
+    this.rollingSamples.push(timeOrA);
     if (this.rollingSamples.length > this.rollingWindowSize) {
       this.rollingSamples.shift();
     }
 
     if (delegate === 'GPU') {
-      stats.gpuSum += time;
+      stats.gpuSum += timeOrA;
       stats.gpuCount += 1;
     } else {
-      stats.cpuSum += time;
+      stats.cpuSum += timeOrA;
       stats.cpuCount += 1;
     }
 
-    stats.history.push({ time, delegate });
+    stats.history.push({ time: timeOrA, delegate });
     if (stats.history.length > this.maxHistorySize) {
       stats.history.shift();
     }
@@ -278,6 +477,38 @@ export class InferenceTimer {
 
   private updateDelegateSummaries() {
     const stats = getRouteStats();
+
+    if (this.mode === 'dual') {
+      if (this.seriesAAvgEl) {
+        if (stats.seriesACount > 0) {
+          const avg = stats.seriesASum / stats.seriesACount;
+          this.seriesAAvgEl.textContent = `${avg.toFixed(1)} ms`;
+        } else {
+          this.seriesAAvgEl.textContent = '--';
+        }
+      }
+      if (this.seriesBAvgEl) {
+        if (stats.seriesBCount > 0) {
+          const avg = stats.seriesBSum / stats.seriesBCount;
+          this.seriesBAvgEl.textContent = `${avg.toFixed(1)} ms`;
+        } else {
+          this.seriesBAvgEl.textContent = '--';
+        }
+      }
+      return;
+    }
+
+    if (this.mode === 'single') {
+      if (this.seriesAAvgEl) {
+        if (stats.seriesACount > 0) {
+          const avg = stats.seriesASum / stats.seriesACount;
+          this.seriesAAvgEl.textContent = `${avg.toFixed(1)} ms`;
+        } else {
+          this.seriesAAvgEl.textContent = '--';
+        }
+      }
+      return;
+    }
 
     if (this.gpuAvgEl) {
       if (stats.gpuCount > 0) {
@@ -349,7 +580,7 @@ export class InferenceTimer {
       return;
     }
 
-    const maxVal = Math.max(...history.map((d) => d.time), 5);
+    const maxVal = Math.max(...history.map((d) => (d.timeB !== undefined ? Math.max(d.time, d.timeB) : d.time)), 5);
     const yMax = maxVal * 1.2;
 
     const formatAxisLabel = (ms: number) => {
@@ -372,7 +603,147 @@ export class InferenceTimer {
 
     const n = history.length;
     const baseLineY = padTop + plotHeight;
+    const getX = (index: number) => (n === 1 ? padLeft + plotWidth / 2 : padLeft + (index / (n - 1)) * plotWidth);
 
+    // 1. DUAL MODE: Draw two distinct series (A and B)
+    if (this.mode === 'dual') {
+      if (n === 1) {
+        const sample = history[0];
+        const yA = getY(sample.time);
+        ctx.fillStyle = GPU_FILL;
+        ctx.fillRect(padLeft, yA, plotWidth, baseLineY - yA);
+        ctx.strokeStyle = GPU_COLOR;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, yA);
+        ctx.lineTo(padLeft + plotWidth, yA);
+        ctx.stroke();
+
+        if (sample.timeB !== undefined) {
+          const yB = getY(sample.timeB);
+          ctx.fillStyle = CPU_FILL;
+          ctx.fillRect(padLeft, yB, plotWidth, baseLineY - yB);
+          ctx.strokeStyle = CPU_COLOR;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(padLeft, yB);
+          ctx.lineTo(padLeft + plotWidth, yB);
+          ctx.stroke();
+        }
+        ctx.restore();
+        return;
+      }
+
+      // Series A (Teal)
+      const ptsA = history.map((s, i) => ({ x: getX(i), y: getY(s.time) }));
+      ctx.fillStyle = GPU_FILL;
+      ctx.beginPath();
+      ctx.moveTo(ptsA[0].x, baseLineY);
+      ptsA.forEach((p) => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(ptsA[ptsA.length - 1].x, baseLineY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = GPU_COLOR;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ptsA.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
+
+      // Series B (Amber)
+      const ptsB = history.map((s, i) => ({ x: getX(i), y: getY(s.timeB ?? 0) }));
+      ctx.fillStyle = CPU_FILL;
+      ctx.beginPath();
+      ctx.moveTo(ptsB[0].x, baseLineY);
+      ptsB.forEach((p) => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(ptsB[ptsB.length - 1].x, baseLineY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = CPU_COLOR;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ptsB.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
+
+      if (n <= 25) {
+        ptsA.forEach((p) => {
+          ctx.fillStyle = GPU_COLOR;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ptsB.forEach((p) => {
+          ctx.fillStyle = CPU_COLOR;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    // 2. SINGLE MODE: Draw single series
+    if (this.mode === 'single') {
+      if (n === 1) {
+        const sample = history[0];
+        const y = getY(sample.time);
+        ctx.fillStyle = GPU_FILL;
+        ctx.fillRect(padLeft, y, plotWidth, baseLineY - y);
+
+        ctx.strokeStyle = GPU_COLOR;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(padLeft + plotWidth, y);
+        ctx.stroke();
+
+        ctx.fillStyle = GPU_COLOR;
+        ctx.beginPath();
+        ctx.arc(padLeft + plotWidth / 2, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        return;
+      }
+
+      const pts = history.map((s, i) => ({ x: getX(i), y: getY(s.time) }));
+      ctx.fillStyle = GPU_FILL;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, baseLineY);
+      pts.forEach((p) => ctx.lineTo(p.x, p.y));
+      ctx.lineTo(pts[pts.length - 1].x, baseLineY);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = GPU_COLOR;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      pts.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+      ctx.stroke();
+
+      if (n <= 25) {
+        pts.forEach((p) => {
+          ctx.fillStyle = GPU_COLOR;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    // 3. DELEGATE MODE: Contiguous delegate segments with transitions
     if (n === 1) {
       const sample = history[0];
       const y = getY(sample.time);
@@ -398,8 +769,6 @@ export class InferenceTimer {
       return;
     }
 
-    const getX = (index: number) => padLeft + (index / (n - 1)) * plotWidth;
-
     // Build contiguous delegate segments splitting at the midpoint when delegate switches
     interface Point {
       x: number;
@@ -412,7 +781,7 @@ export class InferenceTimer {
 
     const segments: Segment[] = [
       {
-        delegate: history[0].delegate,
+        delegate: history[0].delegate ?? 'GPU',
         points: [{ x: getX(0), y: getY(history[0].time) }],
       },
     ];
@@ -425,8 +794,10 @@ export class InferenceTimer {
       const yPrev = getY(prev.time);
       const xCurr = getX(i);
       const yCurr = getY(curr.time);
+      const prevDelegate = prev.delegate ?? 'GPU';
+      const currDelegate = curr.delegate ?? 'GPU';
 
-      if (curr.delegate === prev.delegate) {
+      if (currDelegate === prevDelegate) {
         segments[segments.length - 1].points.push({ x: xCurr, y: yCurr });
       } else {
         const midX = (xPrev + xCurr) / 2;
@@ -434,7 +805,7 @@ export class InferenceTimer {
         segments[segments.length - 1].points.push({ x: midX, y: midY });
         transitionXs.push(midX);
         segments.push({
-          delegate: curr.delegate,
+          delegate: currDelegate,
           points: [
             { x: midX, y: midY },
             { x: xCurr, y: yCurr },
@@ -486,7 +857,7 @@ export class InferenceTimer {
       for (let i = 0; i < n; i++) {
         const x = getX(i);
         const y = getY(history[i].time);
-        ctx.fillStyle = history[i].delegate === 'GPU' ? GPU_COLOR : CPU_COLOR;
+        ctx.fillStyle = (history[i].delegate ?? 'GPU') === 'GPU' ? GPU_COLOR : CPU_COLOR;
         ctx.beginPath();
         ctx.arc(x, y, 2.5, 0, Math.PI * 2);
         ctx.fill();

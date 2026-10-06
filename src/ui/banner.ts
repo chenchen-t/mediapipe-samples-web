@@ -245,6 +245,32 @@ export const TASK_BANNER_LINKS: Record<string, TaskBannerLinks> = {
     stackblitzUrl:
       'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Ftext-embedder.ts',
   },
+  '/retrieval/universal_embedder': {
+    label: 'Universal Embedder',
+    docsUrl: 'https://developers.google.com/edge/mediapipe/solutions/retrieval/universal_embedder/web_js',
+    sampleCodeUrl: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/universal-embedder.ts',
+    samples: {
+      web: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/universal-embedder.ts',
+      android: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/android',
+      ios: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/ios',
+      python: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/universal_embedder/python',
+    },
+    stackblitzUrl:
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Funiversal-embedder.ts',
+  },
+  '/retrieval/semantic_retriever': {
+    label: 'Semantic Retriever',
+    docsUrl: 'https://developers.google.com/edge/mediapipe/solutions/retrieval/semantic_retriever/web_js',
+    sampleCodeUrl: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/semantic-retriever.ts',
+    samples: {
+      web: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/semantic-retriever.ts',
+      android: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/android',
+      ios: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/ios',
+      python: 'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/semantic_retriever/python',
+    },
+    stackblitzUrl:
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fsemantic-retriever.ts',
+  },
 };
 
 export function renderBanner(container: HTMLElement) {

@@ -150,7 +150,7 @@ class TextClassifierTask extends BaseTextTask {
       score: c.score,
     }));
 
-    this.classificationResultUI.updateResults(items);
+    this.classificationResultUI.updateResults(items, this.maxResults);
   }
 }
 

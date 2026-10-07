@@ -102,7 +102,7 @@ class ImageClassifierTask extends BaseVisionTask {
         label: c.categoryName,
         score: c.score,
       }));
-      this.classificationResultUI.updateResults(items);
+      this.classificationResultUI.updateResults(items, this.maxResults);
     } else {
       this.classificationResultUI.clear();
     }

@@ -37,6 +37,7 @@ import { cleanupSemanticRetriever, setupSemanticRetriever } from './tasks/semant
 import { renderSidebar } from './ui/sidebar';
 import { renderMobileNav } from './ui/mobile-nav';
 import { renderBanner, updateBanner } from './ui/banner';
+import { setupCoverPage, cleanupCoverPage } from './ui/cover-page';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -46,7 +47,7 @@ app.innerHTML = `
     <aside class="sidebar"></aside>
     <div class="sidebar-backdrop" aria-hidden="true"></div>
     <div class="mobile-header">
-       <button class="menu-toggle material-icons" aria-label="Open navigation" style="margin-right: 12px; color: var(--text-secondary); background: none; border: none; font-size: 24px; cursor: pointer;">menu</button>
+       <button class="menu-toggle material-icons" aria-label="Open navigation" style="margin-right: 24px; color: var(--text-secondary); background: none; border: none; font-size: 24px; cursor: pointer;">menu</button>
        <div id="mobile-nav-container" style="display: flex; align-items: center; flex-grow: 1; min-width: 0;"></div>
     </div>
     <main class="main-content">
@@ -99,6 +100,7 @@ const mainContent = app.querySelector('#task-stage') as HTMLElement;
 
 // 4. Router Setup
 const routes = {
+  '/home': { setup: setupCoverPage, cleanup: cleanupCoverPage, label: 'Home' },
   '/vision/object_detector': {
     setup: setupObjectDetector,
     cleanup: cleanupObjectDetector,
@@ -168,9 +170,9 @@ let currentCleanup: (() => void) | undefined;
 async function router() {
   let hash = window.location.hash.slice(1);
 
-  // Handle root or invalid routes by defaulting to object detector
+  // Handle root or invalid routes by defaulting to home
   if (!hash || !routes[hash as keyof typeof routes]) {
-    hash = '/vision/object_detector';
+    hash = '/home';
     window.location.hash = hash;
   }
 
@@ -187,6 +189,11 @@ async function router() {
 
   // Setup new task
   if (route) {
+    const isHome = hash === '/home';
+    sidebar.style.display = isHome ? 'none' : '';
+    const mobileHeader = app.querySelector('.mobile-header') as HTMLElement;
+    if (mobileHeader) mobileHeader.style.display = isHome ? 'none' : '';
+
     updateBanner(hash);
     await route.setup(mainContent);
     currentCleanup = route.cleanup;

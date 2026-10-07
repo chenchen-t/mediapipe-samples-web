@@ -86,13 +86,13 @@ export class ClassificationResult {
     }
   }
 
-  public updateResults(results: ClassificationItem[], maxResults: number = results.length) {
-    if (results.length === 0 && maxResults === 0) {
+  public updateResults(results: ClassificationItem[]) {
+    if (results.length === 0 && this.maxRowsRendered === 0) {
       results = [{ label: 'No results', score: 0 }];
-      maxResults = 1;
+    } else {
+      this.maxRowsRendered = Math.max(this.maxRowsRendered, results.length);
     }
-    this.maxRowsRendered = Math.max(this.maxRowsRendered, results.length, maxResults);
-    const totalRows = this.maxRowsRendered;
+    const totalRows = Math.max(this.maxRowsRendered, results.length);
 
     // Get current rows
     const currentRows = Array.from(this.container.children) as HTMLElement[];

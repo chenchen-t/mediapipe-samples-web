@@ -263,7 +263,7 @@ class AudioClassifierTask extends BaseAudioTask {
       score: c.score,
     }));
 
-    this.classificationResultUI.updateResults(items, this.maxResults);
+    this.classificationResultUI.updateResults(items);
   }
 }
 

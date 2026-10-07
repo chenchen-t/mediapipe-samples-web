@@ -259,7 +259,7 @@ export const TASK_BANNER_LINKS: Record<string, TaskBannerLinks> = {
       'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fdecision-maker.ts',
   },
   '/decision/dino_game': {
-    label: 'Dino Game',
+    label: 'Decision Maker - Dino Game',
     docsUrl: MEDIAPIPE_DOCS_OVERVIEW_URL,
     sampleCodeUrl: 'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/dino-game.ts',
     samples: {

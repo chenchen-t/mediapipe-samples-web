@@ -154,7 +154,7 @@ const routes = {
   },
   '/text/text_embedder': { setup: setupTextEmbedder, cleanup: cleanupTextEmbedder, label: 'Text Embedder' },
   '/decision/decision_maker': { setup: setupDecisionMaker, cleanup: cleanupDecisionMaker, label: 'Decision Maker' },
-  '/decision/dino_game': { setup: setupDinoGame, cleanup: cleanupDinoGame, label: 'Dino Game' },
+  '/decision/dino_game': { setup: setupDinoGame, cleanup: cleanupDinoGame, label: 'Decision Maker - Dino Game' },
   '/retrieval/universal_embedder': {
     setup: setupUniversalEmbedder,
     cleanup: cleanupUniversalEmbedder,

@@ -23,10 +23,16 @@ const __dirname = path.dirname(__filename);
 
 test.describe('Navigation & UI', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/#/vision/object_detector');
   });
 
-  test('should redirect to object detection by default', async ({ page }) => {
+  test('should show the home cover page by default', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveURL(/.*#\/home/);
+    await expect(page.locator('.cover-title')).toContainText('MediaPipe Tasks');
+    await expect(page.locator('.sidebar')).toBeHidden();
+
+    await page.click('.cover-card[href="#/vision/object_detector"]');
     await expect(page).toHaveURL(/.*#\/vision\/object_detector/);
     await expect(page.locator('.sidebar-nav .active')).toContainText('Object Detector');
   });

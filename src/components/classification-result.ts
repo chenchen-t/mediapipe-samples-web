@@ -21,6 +21,7 @@ export interface ClassificationItem {
 
 export class ClassificationResult {
   private container: HTMLElement;
+  private maxRowsRendered = 0;
 
   constructor(containerId: string) {
     const el = document.getElementById(containerId);
@@ -90,7 +91,8 @@ export class ClassificationResult {
       results = [{ label: 'No results', score: 0 }];
       maxResults = 1;
     }
-    const totalRows = Math.max(results.length, maxResults);
+    this.maxRowsRendered = Math.max(this.maxRowsRendered, results.length, maxResults);
+    const totalRows = this.maxRowsRendered;
 
     // Get current rows
     const currentRows = Array.from(this.container.children) as HTMLElement[];
@@ -145,6 +147,7 @@ export class ClassificationResult {
   }
 
   public clear() {
-    this.updateResults([], 0);
+    this.maxRowsRendered = 0;
+    this.container.innerHTML = '';
   }
 }

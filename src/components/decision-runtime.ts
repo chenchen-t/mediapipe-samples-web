@@ -187,12 +187,14 @@ class DecisionRuntimeManager {
   }
 
   /** Runs one evaluation in the worker; resolves with the raw worker message. */
-  ask(text: string, kind: DecisionKind, question: object): Promise<any> {
+  ask(input: string | { text?: string; imageBytes?: Uint8Array }, kind: DecisionKind, question: object): Promise<any> {
     if (!this.worker || !this.ready) return Promise.resolve({ type: 'ERROR', error: 'Model not ready' });
     const id = ++this.requestId;
+    const text = typeof input === 'string' ? input : (input.text ?? '');
+    const imageBytes = typeof input === 'object' && input !== null ? input.imageBytes : undefined;
     return new Promise((resolve) => {
       this.resolvers.set(id, resolve);
-      this.worker!.postMessage({ type: 'DECIDE', id, kind, text, question });
+      this.worker!.postMessage({ type: 'DECIDE', id, kind, text, imageBytes, question });
     });
   }
 

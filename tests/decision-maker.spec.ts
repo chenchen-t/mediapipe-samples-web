@@ -116,15 +116,26 @@ test.describe('Decision Maker Task', () => {
     await toggle.locator('button[data-value="vision"]').click();
     await expect(toggle.locator('button[data-value="vision"]')).toHaveClass(/active/);
     await expect(page.locator('#dm-vision-view')).toBeVisible();
+    await expect(page.locator('.model-select')).toHaveValue('embeddinggemma2_text_vision_440m');
     await expect(page.locator('#dv-preset-strip .dv-preset-btn')).toHaveCount(8);
     await expect(page.locator('#dv-rules-list .dv-rule-card')).toHaveCount(9);
-    await expect(page.locator('#dv-verdict-title')).toHaveText('COMPLIANT');
-    await expect(page.locator('#dv-verdict-sub')).toHaveText('9 / 9 Passed');
 
-    // Select a failing preset (Tilted Selfie -> 8 Fails)
-    await page.locator('#dv-preset-strip .dv-preset-btn[data-preset-id="id_fail_tilted_glasses_selfie.jpg"]').click();
-    await expect(page.locator('#dv-verdict-title')).toHaveText('8 ISSUES DETECTED');
-    await expect(page.locator('#dv-verdict-sub')).toHaveText('1 / 9 Passed');
+    const expectedPresetVerdicts: Array<{ id: string; title: string; sub: string }> = [
+      { id: 'passport_compliant_female.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
+      { id: 'passport_compliant_male.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
+      { id: 'id_fail_glasses_smile.jpg', title: '3 ISSUES DETECTED', sub: '6 / 9 Passed' },
+      { id: 'id_fail_eyes_closed_hair.jpg', title: '2 ISSUES DETECTED', sub: '7 / 9 Passed' },
+      { id: 'id_fail_extreme_zoom_cropped.jpg', title: '5 ISSUES DETECTED', sub: '4 / 9 Passed' },
+      { id: 'id_fail_distant_waist_up.jpg', title: '4 ISSUES DETECTED', sub: '5 / 9 Passed' },
+      { id: 'id_fail_tilted_glasses_selfie.jpg', title: '8 ISSUES DETECTED', sub: '1 / 9 Passed' },
+      { id: 'id_fail_mask_hat.jpg', title: '6 ISSUES DETECTED', sub: '3 / 9 Passed' },
+    ];
+
+    for (const preset of expectedPresetVerdicts) {
+      await page.locator(`#dv-preset-strip .dv-preset-btn[data-preset-id="${preset.id}"]`).click();
+      await expect(page.locator('#dv-verdict-title')).toHaveText(preset.title);
+      await expect(page.locator('#dv-verdict-sub')).toHaveText(preset.sub);
+    }
   });
 });
 

@@ -65,11 +65,15 @@ class DecisionMakerTask {
     );
     this.textPlayground.init();
 
-    this.visionPlayground = new DecisionVisionPlayground(this.el['dm-vision-view'], (text, inferenceTime) => {
-      if (inferenceTime === undefined) return this.setStatus(text);
-      this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
-      this.setStatus(`${text} in ${Math.round(inferenceTime)}ms`);
-    });
+    this.visionPlayground = new DecisionVisionPlayground(
+      this.el['dm-vision-view'],
+      (input, kind, question) => decisionRuntime.ask(input, kind, question),
+      (text, inferenceTime) => {
+        if (inferenceTime === undefined) return this.setStatus(text);
+        this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
+        this.setStatus(`${text} in ${Math.round(inferenceTime)}ms`);
+      }
+    );
     this.visionPlayground.init();
 
     new ViewToggle(
@@ -118,6 +122,8 @@ class DecisionMakerTask {
     this.mode = mode;
     if (mode !== 'vision') {
       this.visionPlayground.stopWebcamBooth();
+    } else if (!decisionRuntime.ready && !decisionRuntime.loading && !decisionRuntime.customModel) {
+      decisionRuntime.select('embeddinggemma2_text_vision_440m');
     }
     this.el['dm-text-view'].style.display = mode === 'text' ? '' : 'none';
     this.el['dm-vision-view'].style.display = mode === 'vision' ? '' : 'none';
@@ -125,12 +131,16 @@ class DecisionMakerTask {
 
   /** Mirrors the shared runtime into the playground's Decision box. */
   private syncModelState() {
-    this.textPlayground.setModelState({
+    const state = {
       ready: decisionRuntime.ready,
       loading: decisionRuntime.loading,
       label: decisionRuntime.loading ? decisionRuntime.loadingLabel : (decisionRuntime.loadedLabel ?? ''),
+      loadedValue: decisionRuntime.loadedValue,
+      hasCustomModel: Boolean(decisionRuntime.customModel),
       error: decisionRuntime.failed ? this.lastLoadError : undefined,
-    });
+    };
+    this.textPlayground.setModelState(state);
+    this.visionPlayground.setModelState(state);
   }
 
   cleanup() {

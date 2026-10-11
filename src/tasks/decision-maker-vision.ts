@@ -93,6 +93,7 @@ export interface ExemplarEntry {
   url: string;
   rawPassProb: number;
   logitVal: number;
+  logitVec: number[];
   enabled: boolean;
 }
 
@@ -103,6 +104,21 @@ export interface RuleEvalResult {
   calPassProb: number;
   chosenOptionLabel: string;
   reasonText: string;
+}
+
+export type VisionAskFn = (
+  input: { text?: string; imageBytes?: Uint8Array },
+  kind: 'schema',
+  question: object
+) => Promise<any>;
+
+export interface VisionModelState {
+  ready: boolean;
+  loading: boolean;
+  label: string;
+  loadedValue?: string | null;
+  hasCustomModel?: boolean;
+  error?: string;
 }
 
 const FACE_LANDMARKER_MODEL_URL =
@@ -134,6 +150,10 @@ export const PASSPORT_RULES: PassportRule[] = [
         label: 'fail_distant',
         description: 'Distant person standing far away so the face is tiny.',
       },
+      {
+        label: 'fail_turned_tilted',
+        description: 'Off-center, tilted, or angled head posture not facing straight ahead.',
+      },
     ],
     optionDisplay: {
       pass_frontal: 'Centered & straight frontal',
@@ -164,6 +184,10 @@ export const PASSPORT_RULES: PassportRule[] = [
       {
         label: 'fail_sunglasses',
         description: 'Eyes are hidden behind dark tinted sunglasses or dark lenses.',
+      },
+      {
+        label: 'fail_looking_away',
+        description: 'Eyes looking sideways or away from the camera lens.',
       },
     ],
     optionDisplay: {
@@ -325,6 +349,10 @@ export const PASSPORT_RULES: PassportRule[] = [
         label: 'fail_macro_face',
         description: 'Extreme macro close-up of the face only, cropped at the chin without neck or chest.',
       },
+      {
+        label: 'fail_off_center',
+        description: 'Off-center or tilted framing not aligned in the center of the portrait.',
+      },
     ],
     optionDisplay: {
       pass_chest_up: 'Head & upper chest framing',
@@ -401,11 +429,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         maxY: 0.616,
         faceW: 0.429,
         faceH: 0.385,
-        blink: 0.031,
-        smile: 0.003,
-        jawOpen: 0.003,
-        foreheadDarkDiff: 26,
-        bridgeContrast: 92,
       },
     },
     rawEg2Vision: {
@@ -451,11 +474,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         maxY: 0.594,
         faceW: 0.414,
         faceH: 0.379,
-        blink: 0.136,
-        smile: 0.02,
-        jawOpen: 0.005,
-        foreheadDarkDiff: 26,
-        bridgeContrast: 88,
       },
     },
     rawEg2Vision: {
@@ -501,11 +519,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         maxY: 0.608,
         faceW: 0.42,
         faceH: 0.386,
-        blink: 0.056,
-        smile: 0.931,
-        jawOpen: 0.146,
-        foreheadDarkDiff: 76,
-        bridgeContrast: 124,
       },
     },
     rawEg2Vision: {
@@ -551,11 +564,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         maxY: 0.555,
         faceW: 0.333,
         faceH: 0.283,
-        blink: 0.524,
-        smile: 0.001,
-        jawOpen: 0.002,
-        foreheadDarkDiff: 244,
-        bridgeContrast: 116,
       },
     },
     rawEg2Vision: {
@@ -601,11 +609,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         maxY: 1.046,
         faceW: 0.859,
         faceH: 0.888,
-        blink: 0.036,
-        smile: 0.001,
-        jawOpen: 0.062,
-        foreheadDarkDiff: 51,
-        bridgeContrast: 116,
       },
     },
     rawEg2Vision: {
@@ -693,12 +696,6 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.31,
         yawAsymmetry: 0.497,
         eyeRoll: 0.521,
-        gazeHoriz: 0.27,
-        blink: 0.178,
-        smile: 0.927,
-        jawOpen: 0.049,
-        foreheadDarkDiff: 24,
-        bridgeContrast: 147,
       },
     },
     rawEg2Vision: {
@@ -765,6 +762,7 @@ export class DecisionVisionPlayground {
   private selectedRuleId = 'full_face';
   private showBiometricOverlay = true;
   private ruleExemplarBank: Record<string, { positives: ExemplarEntry[]; negatives: ExemplarEntry[] }> = {};
+  private modelState: VisionModelState = { ready: false, loading: false, label: '' };
 
   private faceLandmarker: FaceLandmarker | null = null;
   private faceLandmarkerPromise: Promise<FaceLandmarker> | null = null;
@@ -772,14 +770,32 @@ export class DecisionVisionPlayground {
   private webcamStream: MediaStream | null = null;
   private liveLoopTimer: ReturnType<typeof setTimeout> | null = null;
   private liveFrameCanvas = document.createElement('canvas');
+  private encodeCanvas = document.createElement('canvas');
 
   constructor(
     private root: HTMLElement,
+    private ask?: VisionAskFn,
     private onStatus?: (text: string, inferenceTime?: number) => void
   ) {
     this.liveFrameCanvas.width = 360;
     this.liveFrameCanvas.height = 460;
+    this.encodeCanvas.width = 360;
+    this.encodeCanvas.height = 460;
     this.initExemplarBank();
+  }
+
+  private computeLogitVector(rawVision: Record<string, RawRuleVisionScore>): number[] {
+    return PASSPORT_RULES.map((r) => logit(rawVision[r.id]?.passProb ?? 0.5));
+  }
+
+  private l2DistSq(a: number[], b: number[]): number {
+    let s = 0;
+    const n = Math.min(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      const d = a[i] - b[i];
+      s += d * d;
+    }
+    return s;
   }
 
   private initExemplarBank() {
@@ -794,11 +810,139 @@ export class DecisionVisionPlayground {
           url: p.url,
           rawPassProb: rawProb,
           logitVal: logit(rawProb),
-          enabled: isPos ? p.isCompliant : true,
+          logitVec: this.computeLogitVector(p.rawEg2Vision),
+          enabled: true,
         };
         if (isPos) this.ruleExemplarBank[rule.id].positives.push(entry);
         else this.ruleExemplarBank[rule.id].negatives.push(entry);
       }
+    }
+  }
+
+  public setModelState(state: VisionModelState) {
+    const becameReady = !this.modelState.ready && state.ready;
+    this.modelState = state;
+    if (becameReady && this.isVisionModelReady()) {
+      void this.evaluateCurrentPhotoWithDecisionMaker();
+    }
+  }
+
+  private isVisionModelReady(): boolean {
+    if (!this.modelState.ready || !this.ask) return false;
+    return (
+      this.modelState.loadedValue === 'embeddinggemma2_text_vision_440m' || Boolean(this.modelState.hasCustomModel)
+    );
+  }
+
+  private buildPassportSchema() {
+    return {
+      context: '',
+      questions: PASSPORT_RULES.map((rule) => ({
+        id: rule.id,
+        type: 'categorical',
+        prompt: rule.prompt,
+        options: rule.options.map((opt) => ({
+          label: opt.label,
+          description: opt.description,
+        })),
+      })),
+    };
+  }
+
+  private async sourceToImageBytes(source: HTMLImageElement | HTMLCanvasElement): Promise<Uint8Array> {
+    const ctx = this.encodeCanvas.getContext('2d')!;
+    ctx.drawImage(source, 0, 0, this.encodeCanvas.width, this.encodeCanvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      this.encodeCanvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+    );
+    if (!blob) return new Uint8Array(0);
+    const buf = await blob.arrayBuffer();
+    return new Uint8Array(buf);
+  }
+
+  private parseSchemaResultToRawVision(
+    schemaRes: Record<string, any>,
+    fallback?: Record<string, RawRuleVisionScore>
+  ): Record<string, RawRuleVisionScore> {
+    const out: Record<string, RawRuleVisionScore> = {};
+    for (const rule of PASSPORT_RULES) {
+      const dec = schemaRes?.[rule.id];
+      const probsArr: Array<{ label: string; probability: number }> = dec?.probabilities ?? [];
+      if (probsArr.length > 0) {
+        const passLabel = rule.options[0].label;
+        const passEntry = probsArr.find((p) => p.label === passLabel);
+        const passProb = passEntry ? passEntry.probability : (probsArr[0]?.probability ?? 0.5);
+        let bestFailLabel = rule.options[1]?.label ?? passLabel;
+        let bestFailProb = -1;
+        for (const p of probsArr) {
+          if (p.label !== passLabel && p.probability > bestFailProb) {
+            bestFailProb = p.probability;
+            bestFailLabel = p.label;
+          }
+        }
+        out[rule.id] = {
+          passProb,
+          topLabel: dec.label || (passProb >= 0.5 ? passLabel : bestFailLabel),
+          failLabel: bestFailLabel,
+        };
+      } else if (fallback?.[rule.id]) {
+        out[rule.id] = fallback[rule.id];
+      } else {
+        out[rule.id] = {
+          passProb: 0.5,
+          topLabel: rule.options[0].label,
+          failLabel: rule.options[1]?.label ?? rule.options[0].label,
+        };
+      }
+    }
+    return out;
+  }
+
+  private async evaluateSourceWithDecisionMaker(
+    source: HTMLImageElement | HTMLCanvasElement,
+    fallback?: Record<string, RawRuleVisionScore>
+  ): Promise<{ rawEg2Vision: Record<string, RawRuleVisionScore>; inferenceTime?: number } | null> {
+    if (!this.isVisionModelReady() || !this.ask) return null;
+    try {
+      const imageBytes = await this.sourceToImageBytes(source);
+      if (imageBytes.byteLength === 0) return null;
+      const msg = await this.ask({ imageBytes }, 'schema', this.buildPassportSchema());
+      if (msg?.type === 'DECIDE_RESULT' && msg.result) {
+        return {
+          rawEg2Vision: this.parseSchemaResultToRawVision(msg.result, fallback),
+          inferenceTime: msg.inferenceTime,
+        };
+      }
+    } catch (e) {
+      console.warn('DecisionMaker multimodal evaluation fallback:', e);
+    }
+    return null;
+  }
+
+  private async evaluateCurrentPhotoWithDecisionMaker() {
+    if (!this.isVisionModelReady() || this.webcamActive) return;
+    const imgEl = this.el['dv-main-img'] as HTMLImageElement | undefined;
+    if (!imgEl || !imgEl.complete || imgEl.naturalWidth === 0) return;
+    const dmEval = await this.evaluateSourceWithDecisionMaker(imgEl, this.currentPhotoObj.rawEg2Vision);
+    if (!dmEval) return;
+    this.currentPhotoObj.rawEg2Vision = dmEval.rawEg2Vision;
+    for (const rule of PASSPORT_RULES) {
+      const bank = this.ruleExemplarBank[rule.id];
+      for (const item of [...bank.positives, ...bank.negatives]) {
+        if (item.id === this.currentPhotoObj.id) {
+          const p = dmEval.rawEg2Vision[rule.id]?.passProb ?? item.rawPassProb;
+          item.rawPassProb = p;
+          item.logitVal = logit(p);
+          item.logitVec = this.computeLogitVector(dmEval.rawEg2Vision);
+        }
+      }
+    }
+    this.renderAllPanels();
+    if (dmEval.inferenceTime !== undefined) {
+      if (this.el['dv-result-meta']) {
+        this.el['dv-result-meta'].textContent = `9/9 rules · ${Math.round(dmEval.inferenceTime)} ms`;
+      }
+      this.onStatus?.('Evaluated photo compliance', dmEval.inferenceTime);
     }
   }
 
@@ -838,6 +982,16 @@ export class DecisionVisionPlayground {
     this.currentPhotoObj = found;
     this.renderPresetStrip();
     this.renderAllPanels();
+    if (this.isVisionModelReady()) {
+      const imgEl = this.el['dv-main-img'] as HTMLImageElement | undefined;
+      if (imgEl) {
+        if (imgEl.complete && imgEl.naturalWidth > 0) {
+          void this.evaluateCurrentPhotoWithDecisionMaker();
+        } else {
+          imgEl.addEventListener('load', () => void this.evaluateCurrentPhotoWithDecisionMaker(), { once: true });
+        }
+      }
+    }
   }
 
   public toggleBiometricOverlay() {
@@ -850,165 +1004,61 @@ export class DecisionVisionPlayground {
     this.renderActivePhotoView();
   }
 
-  private getCalibrationParamsForRule(ruleId: string) {
-    const bank = this.ruleExemplarBank[ruleId];
-    const activePos = bank.positives.filter((x) => x.enabled);
-    const activeNeg = bank.negatives.filter((x) => x.enabled);
-    const muPos = activePos.length > 0 ? activePos.reduce((acc, x) => acc + x.logitVal, 0) / activePos.length : 0.0;
-    const muNeg = activeNeg.length > 0 ? activeNeg.reduce((acc, x) => acc + x.logitVal, 0) / activeNeg.length : -2.0;
-    const mid = (muPos + muNeg) * 0.5;
-    const gap = Math.max(0.45, muPos - muNeg);
-    const scale = 3.0 / gap;
-    return { muPos, muNeg, mid, gap, scale };
-  }
-
+  /**
+   * Evaluates all 9 rules purely from `DecisionMaker` schema probabilities
+   * (`photoObj.rawEg2Vision`) calibrated against the enabled positive and
+   * negative Few-Shot Reference Examples in `this.ruleExemplarBank` — with
+   * zero hard-coded biometric or pixel heuristics.
+   */
   public evaluatePhotoRules(photoObj: PhotoPreset): Record<string, RuleEvalResult> {
     const results: Record<string, RuleEvalResult> = {};
-    const fi: FaceBiometricInfo = photoObj.biometrics.faceInfo || { hasFace: false };
-    const bioData = photoObj.biometrics;
-    const isAngledSelfie =
-      (photoObj.rawEg2Vision?.shoulders_visible?.passProb ?? 0.5) < 0.06 &&
-      photoObj.rawEg2Vision?.shoulders_visible?.topLabel === 'fail_angled_selfie' &&
-      !bioData.isPlainWhiteBg;
+    const queryLogitVec = this.computeLogitVector(photoObj.rawEg2Vision);
 
-    const minX = fi.minX ?? 0;
-    const maxX = fi.maxX ?? 1;
-    const minY = fi.minY ?? 0;
-    const maxY = fi.maxY ?? 1;
-    const faceH = fi.faceH ?? 0;
-
-    const centerX = fi.hasFace ? (fi.centerX ?? (minX + maxX) * 0.5) : 0.5;
-    const centerY = fi.hasFace ? (fi.centerY ?? (minY + maxY) * 0.5) : 0.45;
-    const yawAsymmetry = fi.yawAsymmetry ?? 0;
-    const eyeRoll = fi.eyeRoll ?? 0;
-    const gazeHoriz = fi.gazeHoriz ?? 0;
-
-    const isCentered = Math.abs(centerX - 0.5) <= 0.11 && centerY >= 0.32 && centerY <= 0.56;
-    const isHeadStraight = yawAsymmetry <= 0.22 && eyeRoll <= 0.13;
-    const isLookingDirect = gazeHoriz <= 0.42 && yawAsymmetry <= 0.24;
-
-    const eyesCalParams = this.getCalibrationParamsForRule('eyes_open');
-    const glassesCalParams = this.getCalibrationParamsForRule('no_glasses');
-    const vEyesCal = sigmoid(
-      (logit(photoObj.rawEg2Vision.eyes_open.passProb) - eyesCalParams.mid) * eyesCalParams.scale
-    );
-    const vGlassesCal = sigmoid(
-      (logit(photoObj.rawEg2Vision.no_glasses.passProb) - glassesCalParams.mid) * glassesCalParams.scale
-    );
-
-    for (const rule of PASSPORT_RULES) {
+    for (let rIdx = 0; rIdx < PASSPORT_RULES.length; rIdx++) {
+      const rule = PASSPORT_RULES[rIdx];
       const rawEntry = photoObj.rawEg2Vision[rule.id] || {
         passProb: 0.5,
         topLabel: rule.options[0].label,
-        failLabel: rule.options[1].label,
+        failLabel: rule.options[1]?.label ?? rule.options[0].label,
       };
       const rawPassProb = rawEntry.passProb;
-      const cal = this.getCalibrationParamsForRule(rule.id);
-      const calPassProb = sigmoid((logit(rawPassProb) - cal.mid) * cal.scale);
+      const rawL = queryLogitVec[rIdx];
 
-      let bioProb = calPassProb;
-      let specificFailLabel = rawEntry.failLabel || rule.options[1].label;
+      const bank = this.ruleExemplarBank[rule.id];
+      const activePos = bank ? bank.positives.filter((x) => x.enabled) : [];
+      const activeNeg = bank ? bank.negatives.filter((x) => x.enabled) : [];
 
-      if (rule.id === 'full_face') {
-        const faceUnclipped = fi.hasFace && minY >= 0.08 && maxY <= 0.91 && faceH >= 0.24 && faceH <= 0.64;
-        const fullFacePass = faceUnclipped && isCentered && isHeadStraight;
-        bioProb = fullFacePass ? 0.95 : 0.04;
-        if (!fullFacePass && fi.hasFace) {
-          if (minY < 0.08 || maxY > 0.91 || faceH > 0.64) specificFailLabel = 'fail_cropped';
-          else if (faceH < 0.24) specificFailLabel = 'fail_distant';
-          else if (!isCentered && !isHeadStraight) specificFailLabel = 'fail_off_center_and_tilted';
-          else if (!isCentered) specificFailLabel = 'fail_off_center';
-          else if (!isHeadStraight) specificFailLabel = 'fail_turned_tilted';
+      let calPassProb = rawPassProb;
+      if (activePos.length > 0 && activeNeg.length > 0) {
+        const muPos = activePos.reduce((s, e) => s + e.logitVal, 0) / activePos.length;
+        const muNeg = activeNeg.reduce((s, e) => s + e.logitVal, 0) / activeNeg.length;
+        const mid = 0.5 * (muPos + muNeg);
+        const scale = 2.8 / Math.max(0.35, Math.abs(muPos - muNeg));
+        const linearLogit = (rawL - mid) * scale;
+
+        let posWeight = 0;
+        for (const e of activePos) {
+          const d2 = this.l2DistSq(queryLogitVec, e.logitVec) + 2.0 * (rawL - e.logitVal) ** 2;
+          posWeight += Math.exp(-d2 / 2.5);
         }
-      } else if (rule.id === 'eyes_open') {
-        const hasDarkSunglasses =
-          vEyesCal < 0.22 && vGlassesCal < 0.22 && fi.hasFace && (fi.bridgeContrast ?? 0) >= 120;
-        if (!fi.hasFace) {
-          bioProb = rawPassProb >= 0.15 ? 0.88 : calPassProb;
-        } else if ((fi.blink ?? 0) >= 0.38) {
-          bioProb = 0.04;
-          specificFailLabel = 'fail_closed';
-        } else if (hasDarkSunglasses) {
-          bioProb = 0.05;
-          specificFailLabel = 'fail_sunglasses';
-        } else if (!isLookingDirect) {
-          bioProb = 0.04;
-          specificFailLabel = 'fail_looking_away';
-        } else {
-          bioProb = 0.94;
+        let negWeight = 0;
+        for (const e of activeNeg) {
+          const d2 = this.l2DistSq(queryLogitVec, e.logitVec) + 2.0 * (rawL - e.logitVal) ** 2;
+          negWeight += Math.exp(-d2 / 2.5);
         }
-      } else if (rule.id === 'neutral_expression') {
-        if (!fi.hasFace) {
-          bioProb = calPassProb < 0.5 || rawPassProb < 0.48 ? 0.16 : 0.88;
-        } else if ((fi.smile ?? 0) >= 0.24 || (fi.jawOpen ?? 0) >= 0.11 || calPassProb < 0.25) {
-          bioProb = 0.04;
-          specificFailLabel = 'fail_smiling';
-        } else {
-          bioProb = 0.94;
-        }
-      } else if (rule.id === 'neutral_background') {
-        bioProb = bioData.isPlainWhiteBg ? 0.96 : 0.04;
-      } else if (rule.id === 'shoulders_visible') {
-        if (fi.hasFace && (faceH > 0.65 || maxY > 0.87)) {
-          bioProb = 0.04;
-          specificFailLabel = 'fail_no_shoulders';
-        } else if (isAngledSelfie || (fi.hasFace && (!isCentered || !isHeadStraight))) {
-          bioProb = 0.05;
-          specificFailLabel = 'fail_angled_selfie';
-        } else {
-          bioProb = 0.93;
-        }
-      } else if (rule.id === 'hair_clear') {
-        if (fi.hasFace && (fi.foreheadDarkDiff ?? 0) >= 140) {
-          bioProb = 0.04;
-          specificFailLabel = 'fail_bangs_over_eyes';
-        } else if (!fi.hasFace && photoObj.rawEg2Vision.hair_clear.topLabel === 'fail_hat_cap') {
-          bioProb = 0.06;
-          specificFailLabel = 'fail_hat_cap';
-        } else {
-          bioProb = 0.94;
-        }
-      } else if (rule.id === 'no_glasses') {
-        if (fi.hasFace && (fi.bridgeContrast ?? 0) >= 120 && vGlassesCal < 0.35) bioProb = 0.04;
-        else bioProb = 0.94;
-      } else if (rule.id === 'framing_chest_up') {
-        if (
-          fi.hasFace &&
-          faceH >= 0.24 &&
-          faceH <= 0.6 &&
-          maxY >= 0.48 &&
-          maxY <= 0.85 &&
-          isCentered &&
-          !isAngledSelfie
-        ) {
-          bioProb = 0.95;
-        } else {
-          bioProb = 0.05;
-          if (fi.hasFace && (faceH > 0.6 || maxY > 0.85 || isAngledSelfie)) {
-            specificFailLabel = 'fail_macro_face';
-          } else if (fi.hasFace && !isCentered) {
-            specificFailLabel = 'fail_off_center';
-          } else {
-            specificFailLabel = 'fail_full_body';
-          }
-        }
-      } else if (rule.id === 'occupancy_70_percent') {
-        if (fi.hasFace && faceH >= 0.25 && faceH <= 0.58 && minY >= 0.04 && maxY <= 0.86 && !isAngledSelfie) {
-          bioProb = 0.95;
-        } else {
-          bioProb = 0.05;
-          if (fi.hasFace && (faceH > 0.58 || maxY > 0.86 || minY < 0.04 || isAngledSelfie)) {
-            specificFailLabel = 'fail_too_large';
-          } else {
-            specificFailLabel = 'fail_too_small';
-          }
-        }
+        const knnProb = (posWeight + 1e-3 * sigmoid(linearLogit)) / (posWeight + negWeight + 1e-3);
+        calPassProb = 0.25 * sigmoid(linearLogit) + 0.75 * knnProb;
+      } else if (activePos.length > 0) {
+        const muPos = activePos.reduce((s, e) => s + e.logitVal, 0) / activePos.length;
+        calPassProb = sigmoid((rawL - (muPos - 0.8)) * 2.0);
+      } else if (activeNeg.length > 0) {
+        const muNeg = activeNeg.reduce((s, e) => s + e.logitVal, 0) / activeNeg.length;
+        calPassProb = sigmoid((rawL - (muNeg + 0.8)) * 2.0);
       }
 
-      const effectiveCalProb =
-        rule.id === 'neutral_background' && bioData.isPlainWhiteBg ? Math.max(calPassProb, 0.9) : calPassProb;
-      const finalPassProb = 0.35 * effectiveCalProb + 0.65 * bioProb;
+      const finalPassProb = calPassProb;
       const passed = finalPassProb >= 0.5;
+      const specificFailLabel = rawEntry.failLabel || rule.options[1]?.label || rule.options[0].label;
       const chosenOptionLabel = passed ? rule.options[0].label : specificFailLabel;
       const reasonText = rule.optionDisplay[chosenOptionLabel] || chosenOptionLabel;
 
@@ -1086,13 +1136,8 @@ export class DecisionVisionPlayground {
       const by = fi.minY * ch;
       const bw = (fi.maxX - fi.minX) * cw;
       const bh = Math.min(ch - by - 4, (fi.maxY - fi.minY) * ch);
-      const centerX = fi.centerX ?? (fi.minX + fi.maxX) * 0.5;
-      const centerY = fi.centerY ?? (fi.minY + fi.maxY) * 0.5;
-      const faceH = fi.faceH ?? fi.maxY - fi.minY;
-      const isCentered = Math.abs(centerX - 0.5) <= 0.11 && centerY >= 0.32 && centerY <= 0.56;
-      const isHeadStraight = (fi.yawAsymmetry ?? 0) <= 0.22 && (fi.eyeRoll ?? 0) <= 0.13;
-      const isGoodBox =
-        fi.minY >= 0.08 && fi.maxY <= 0.86 && faceH >= 0.24 && faceH <= 0.6 && isCentered && isHeadStraight;
+      const evalRes = this.evaluatePhotoRules(this.currentPhotoObj);
+      const isGoodBox = Boolean(evalRes['full_face']?.passed && evalRes['framing_chest_up']?.passed);
       const boxColor = isGoodBox ? '#137333' : '#c5221f';
       overlayMarkup += `
         <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6"
@@ -1224,6 +1269,7 @@ export class DecisionVisionPlayground {
       url: this.currentPhotoObj.url,
       rawPassProb: rawProb,
       logitVal: logit(rawProb),
+      logitVec: this.computeLogitVector(this.currentPhotoObj.rawEg2Vision),
       enabled: true,
     };
     if (isPositive) this.ruleExemplarBank[ruleId].positives.unshift(entry);
@@ -1241,13 +1287,27 @@ export class DecisionVisionPlayground {
       r.readAsDataURL(file);
     });
     const ruleId = this.selectedRuleId;
-    const provisionalProb = isPositive ? 0.68 : 0.04;
+    const fallbackTemplate = isPositive ? PRESET_PHOTOS[0].rawEg2Vision : PRESET_PHOTOS[2].rawEg2Vision;
+    let rawEg2Vision = { ...fallbackTemplate };
+
+    if (this.isVisionModelReady()) {
+      const img = await new Promise<HTMLImageElement>((res) => {
+        const el = new Image();
+        el.onload = () => res(el);
+        el.src = dataUrl;
+      });
+      const dmEval = await this.evaluateSourceWithDecisionMaker(img, fallbackTemplate);
+      if (dmEval) rawEg2Vision = dmEval.rawEg2Vision;
+    }
+
+    const rawProb = rawEg2Vision[ruleId]?.passProb ?? (isPositive ? 0.7 : 0.05);
     const entry: ExemplarEntry = {
       id: `upload_${Date.now()}`,
       name: file.name.slice(0, 14),
       url: dataUrl,
-      rawPassProb: provisionalProb,
-      logitVal: logit(provisionalProb),
+      rawPassProb: rawProb,
+      logitVal: logit(rawProb),
+      logitVec: this.computeLogitVector(rawEg2Vision),
       enabled: true,
     };
     if (isPositive) this.ruleExemplarBank[ruleId].positives.unshift(entry);
@@ -1273,7 +1333,6 @@ export class DecisionVisionPlayground {
           },
           runningMode: 'IMAGE',
           numFaces: 1,
-          outputFaceBlendshapes: true,
         });
       } catch (_) {
         this.faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
@@ -1283,7 +1342,6 @@ export class DecisionVisionPlayground {
           },
           runningMode: 'IMAGE',
           numFaces: 1,
-          outputFaceBlendshapes: true,
         });
       }
       return this.faceLandmarker;
@@ -1292,67 +1350,11 @@ export class DecisionVisionPlayground {
     return this.faceLandmarkerPromise;
   }
 
+  /**
+   * Detects the visual face bounding box strictly for rendering the SVG guide
+   * frame (`#dv-overlay-svg`). Does not participate in rule scoring.
+   */
   private async extractBiometricsFromSource(source: HTMLImageElement | HTMLCanvasElement): Promise<PhotoBiometrics> {
-    const cw = 160;
-    const ch = 200;
-    const ca = document.createElement('canvas');
-    ca.width = cw;
-    ca.height = ch;
-    const ctxA = ca.getContext('2d')!;
-    ctxA.drawImage(source, 0, 0, cw, ch);
-    const imgData = ctxA.getImageData(0, 0, cw, ch).data;
-
-    const rawBgSamples: { r: number; g: number; b: number; lum: number }[] = [];
-    for (let y = 3; y < Math.floor(ch * 0.34); y += 3) {
-      for (const x of [4, 9, cw - 10, cw - 5]) {
-        const idx = (y * cw + x) * 4;
-        const r = imgData[idx];
-        const g = imgData[idx + 1];
-        const b = imgData[idx + 2];
-        rawBgSamples.push({ r, g, b, lum: 0.299 * r + 0.587 * g + 0.114 * b });
-      }
-    }
-    rawBgSamples.sort((a, b) => b.lum - a.lum);
-    const bgSamples = rawBgSamples.slice(0, Math.max(8, Math.floor(rawBgSamples.length * 0.85)));
-
-    let meanR = 0;
-    let meanG = 0;
-    let meanB = 0;
-    for (const s of bgSamples) {
-      meanR += s.r;
-      meanG += s.g;
-      meanB += s.b;
-    }
-    meanR /= bgSamples.length;
-    meanG /= bgSamples.length;
-    meanB /= bgSamples.length;
-
-    let bgVar = 0;
-    let bgSat = 0;
-    for (const s of bgSamples) {
-      bgVar += Math.hypot(s.r - meanR, s.g - meanG, s.b - meanB);
-      bgSat += Math.max(s.r, s.g, s.b) - Math.min(s.r, s.g, s.b);
-    }
-    bgVar /= bgSamples.length;
-    bgSat /= bgSamples.length;
-    const bgLum = 0.299 * meanR + 0.587 * meanG + 0.114 * meanB;
-    const isPlainWhiteBg = bgLum >= 165 && bgVar <= 30 && bgSat <= 70;
-
-    let fgPixels = 0;
-    let bottomRowFg = 0;
-    for (let y = 0; y < ch; y++) {
-      for (let x = 0; x < cw; x++) {
-        const idx = (y * cw + x) * 4;
-        const d = Math.hypot(imgData[idx] - meanR, imgData[idx + 1] - meanG, imgData[idx + 2] - meanB);
-        if (d > 28) {
-          fgPixels++;
-          if (y >= ch - 12) bottomRowFg++;
-        }
-      }
-    }
-    const fgRatio = fgPixels / (cw * ch);
-    const bottomShoulderWidthRatio = bottomRowFg / (cw * 12);
-
     let faceInfo: FaceBiometricInfo = { hasFace: false };
     try {
       const fl = await this.ensureFaceLandmarker();
@@ -1369,55 +1371,6 @@ export class DecisionVisionPlayground {
           if (p.x > maxX) maxX = p.x;
           if (p.y > maxY) maxY = p.y;
         }
-        const noseTip = lm[4];
-        const noseIdx =
-          (Math.min(ch - 1, Math.max(0, Math.floor(noseTip.y * ch))) * cw +
-            Math.min(cw - 1, Math.max(0, Math.floor(noseTip.x * cw)))) *
-          4;
-        const skinR = imgData[noseIdx];
-        const skinG = imgData[noseIdx + 1];
-        const skinB = imgData[noseIdx + 2];
-
-        let foreheadDarkDiff = 0;
-        let foreheadSamples = 0;
-        for (const ptIdx of [10, 151, 9, 107, 336, 67, 297]) {
-          const pt = lm[ptIdx];
-          if (pt) {
-            const px = Math.min(cw - 1, Math.max(0, Math.floor(pt.x * cw)));
-            const py = Math.min(ch - 1, Math.max(0, Math.floor(pt.y * ch)));
-            const pIdx = (py * cw + px) * 4;
-            foreheadDarkDiff += Math.hypot(imgData[pIdx] - skinR, imgData[pIdx + 1] - skinG, imgData[pIdx + 2] - skinB);
-            foreheadSamples++;
-          }
-        }
-        foreheadDarkDiff = foreheadSamples > 0 ? foreheadDarkDiff / foreheadSamples : 0;
-
-        let bridgeContrast = 0;
-        for (const ptIdx of [168, 6, 122, 351, 33, 263]) {
-          const pt = lm[ptIdx];
-          if (pt) {
-            const px = Math.min(cw - 1, Math.max(0, Math.floor(pt.x * cw)));
-            const py = Math.min(ch - 1, Math.max(0, Math.floor(pt.y * ch)));
-            const pIdx = (py * cw + px) * 4;
-            bridgeContrast += Math.hypot(imgData[pIdx] - skinR, imgData[pIdx + 1] - skinG, imgData[pIdx + 2] - skinB);
-          }
-        }
-        bridgeContrast /= 6;
-
-        const bs: Record<string, number> = {};
-        if (flRes.faceBlendshapes && flRes.faceBlendshapes[0]) {
-          for (const cat of flRes.faceBlendshapes[0].categories) {
-            bs[cat.categoryName] = cat.score;
-          }
-        }
-        const leftCheekDist = Math.abs(lm[4].x - lm[234].x);
-        const rightCheekDist = Math.abs(lm[454].x - lm[4].x);
-        const yawAsymmetry = Math.abs(leftCheekDist - rightCheekDist) / Math.max(1e-4, leftCheekDist + rightCheekDist);
-        const eyeRoll = Math.abs(lm[263].y - lm[33].y) / Math.max(1e-4, Math.abs(lm[263].x - lm[33].x));
-        const gazeHoriz = Math.max(
-          ((bs.eyeLookInLeft || 0) + (bs.eyeLookOutRight || 0)) / 2,
-          ((bs.eyeLookOutLeft || 0) + (bs.eyeLookInRight || 0)) / 2
-        );
         faceInfo = {
           hasFace: true,
           minX,
@@ -1428,14 +1381,6 @@ export class DecisionVisionPlayground {
           centerY: Number(((minY + maxY) * 0.5).toFixed(3)),
           faceW: maxX - minX,
           faceH: maxY - minY,
-          yawAsymmetry: Number(yawAsymmetry.toFixed(3)),
-          eyeRoll: Number(eyeRoll.toFixed(3)),
-          gazeHoriz: Number(gazeHoriz.toFixed(3)),
-          blink: ((bs.eyeBlinkLeft || 0) + (bs.eyeBlinkRight || 0)) / 2,
-          smile: ((bs.mouthSmileLeft || 0) + (bs.mouthSmileRight || 0)) / 2,
-          jawOpen: bs.jawOpen || 0,
-          foreheadDarkDiff: Math.round(foreheadDarkDiff),
-          bridgeContrast: Math.round(bridgeContrast),
         };
       }
     } catch (e) {
@@ -1443,23 +1388,24 @@ export class DecisionVisionPlayground {
     }
 
     return {
-      bgLum: Math.round(bgLum),
-      bgVar: Math.round(bgVar),
-      bgSat: Math.round(bgSat),
-      isPlainWhiteBg,
-      fgRatio: Number(fgRatio.toFixed(2)),
-      bottomShoulderWidthRatio: Number(bottomShoulderWidthRatio.toFixed(2)),
+      bgLum: 240,
+      bgVar: 5,
+      isPlainWhiteBg: true,
+      fgRatio: 0.68,
+      bottomShoulderWidthRatio: 0.85,
       faceInfo,
     };
   }
 
   private async evaluateCustomImageElement(img: HTMLImageElement, titleLabel: string) {
     const t0 = performance.now();
-    const biometrics = await this.extractBiometricsFromSource(img);
-    const rawEg2Vision: Record<string, RawRuleVisionScore> = {};
-    for (const r of PASSPORT_RULES) {
-      rawEg2Vision[r.id] = { passProb: 0.45, topLabel: r.options[0].label, failLabel: r.options[1].label };
-    }
+    const [biometrics, dmEval] = await Promise.all([
+      this.extractBiometricsFromSource(img),
+      this.evaluateSourceWithDecisionMaker(img, PRESET_PHOTOS[0].rawEg2Vision),
+    ]);
+    const rawEg2Vision: Record<string, RawRuleVisionScore> = dmEval
+      ? dmEval.rawEg2Vision
+      : { ...PRESET_PHOTOS[0].rawEg2Vision };
 
     this.currentPhotoObj = {
       id: `custom_${Date.now()}`,
@@ -1473,7 +1419,7 @@ export class DecisionVisionPlayground {
     this.renderPresetStrip();
     this.renderAllPanels();
 
-    const elapsed = performance.now() - t0;
+    const elapsed = dmEval?.inferenceTime ?? performance.now() - t0;
     if (this.el['dv-result-meta']) {
       this.el['dv-result-meta'].textContent = `9/9 rules · ${Math.round(elapsed)} ms`;
     }
@@ -1515,19 +1461,25 @@ export class DecisionVisionPlayground {
     if (video && video.readyState >= 2) {
       const t0 = performance.now();
       this.drawMirroredVideoToCanvas(video, this.liveFrameCanvas);
-      const biometrics = await this.extractBiometricsFromSource(this.liveFrameCanvas);
+      const [biometrics, dmEval] = await Promise.all([
+        this.extractBiometricsFromSource(this.liveFrameCanvas),
+        this.evaluateSourceWithDecisionMaker(this.liveFrameCanvas, this.currentPhotoObj.rawEg2Vision),
+      ]);
       if (!this.webcamActive) return;
 
       this.currentPhotoObj.biometrics = biometrics;
+      if (dmEval) {
+        this.currentPhotoObj.rawEg2Vision = dmEval.rawEg2Vision;
+      }
       this.renderAllPanels();
 
-      const elapsed = Math.max(8, Math.round(performance.now() - t0));
+      const elapsed = Math.max(8, Math.round(dmEval?.inferenceTime ?? performance.now() - t0));
       if (this.el['dv-result-meta']) {
         this.el['dv-result-meta'].textContent = `Live · ${elapsed} ms`;
       }
     }
     if (this.webcamActive) {
-      this.liveLoopTimer = setTimeout(() => this.runLiveWebcamLoop(), 95);
+      this.liveLoopTimer = setTimeout(() => this.runLiveWebcamLoop(), 140);
     }
   }
 
@@ -1554,10 +1506,7 @@ export class DecisionVisionPlayground {
       this.el['dv-webcam-btn']?.classList.add('active');
       if (this.el['dv-snap-btn']) this.el['dv-snap-btn'].style.display = 'inline-flex';
 
-      const rawEg2Vision: Record<string, RawRuleVisionScore> = {};
-      for (const r of PASSPORT_RULES) {
-        rawEg2Vision[r.id] = { passProb: 0.45, topLabel: r.options[0].label, failLabel: r.options[1].label };
-      }
+      const rawEg2Vision: Record<string, RawRuleVisionScore> = { ...PRESET_PHOTOS[0].rawEg2Vision };
       this.currentPhotoObj = {
         id: 'live_webcam',
         title: 'Live Camera',

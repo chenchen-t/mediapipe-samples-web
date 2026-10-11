@@ -79,11 +79,19 @@ export function mountDecisionModelPanel(modelContainer: HTMLElement, delegateCon
     }
   );
 
+  const stdSelect = modelContainer.querySelector<HTMLSelectElement>('#model-selector-container-standard-select');
+  stdSelect?.addEventListener('change', () => {
+    decisionRuntime.modelName = stdSelect.value;
+  });
+
   delegateSelect.addEventListener('change', () => decisionRuntime.setDelegate(delegateSelect.value as Delegate));
 
   const renderState = () => {
     const rt = decisionRuntime;
     delegateSelect.value = rt.delegate;
+    if (stdSelect && !rt.loading && !rt.loadedLabel && stdSelect.value !== rt.modelName) {
+      stdSelect.value = rt.modelName;
+    }
     selector.setBusy(rt.loading);
     if (rt.loading) {
       selector.setStatus(`Loading ${rt.loadingLabel}...`);

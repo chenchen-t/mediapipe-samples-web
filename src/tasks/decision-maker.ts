@@ -72,7 +72,8 @@ class DecisionMakerTask {
         if (inferenceTime === undefined) return this.setStatus(text);
         this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
         this.setStatus(`${text} in ${Math.round(inferenceTime)}ms`);
-      }
+      },
+      () => this.ensureVisionModelLoaded()
     );
     this.visionPlayground.init();
 
@@ -141,6 +142,35 @@ class DecisionMakerTask {
     };
     this.textPlayground.setModelState(state);
     this.visionPlayground.setModelState(state);
+  }
+
+  private ensureVisionModelLoaded(): Promise<boolean> {
+    if (
+      decisionRuntime.ready &&
+      (decisionRuntime.loadedValue === 'embeddinggemma2_text_vision_440m' || Boolean(decisionRuntime.customModel))
+    ) {
+      return Promise.resolve(true);
+    }
+    const isLoadingVision =
+      decisionRuntime.loading &&
+      (decisionRuntime.loadingValue === 'embeddinggemma2_text_vision_440m' || Boolean(decisionRuntime.customModel));
+    if (!isLoadingVision) {
+      if (!decisionRuntime.customModel) {
+        decisionRuntime.select('embeddinggemma2_text_vision_440m');
+      }
+      void decisionRuntime.load();
+    }
+    return new Promise((resolve) => {
+      const unsubscribe = decisionRuntime.subscribe((event) => {
+        if (event.type === 'ready') {
+          unsubscribe();
+          resolve(true);
+        } else if (event.type === 'error') {
+          unsubscribe();
+          resolve(false);
+        }
+      });
+    });
   }
 
   cleanup() {

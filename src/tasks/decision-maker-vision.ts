@@ -21,7 +21,6 @@
  * negative reference examples per rule.
  */
 
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import template from '../templates/decision-maker-vision.html?raw';
 
 export interface PassportRuleOption {
@@ -121,9 +120,6 @@ export interface VisionModelState {
   error?: string;
 }
 
-const FACE_LANDMARKER_MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
-
 export const PASSPORT_RULES: PassportRule[] = [
   {
     id: 'full_face',
@@ -171,23 +167,23 @@ export const PASSPORT_RULES: PassportRule[] = [
     icon: 'visibility',
     shortTitle: 'Eyes Open',
     title: '2. Eyes Open & Direct',
-    prompt: 'Are both eyes clearly open, visible, and looking straight at the camera?',
+    prompt: 'Are both eyes open and looking straight ahead at the camera?',
     options: [
       {
         label: 'pass_open',
-        description: 'Both eyes are wide open with visible pupils and irises looking directly at the camera lens.',
+        description: 'Passport portrait of a person with both eyes open looking straight ahead at the camera.',
       },
       {
         label: 'fail_closed',
-        description: 'Both eyes are shut closed, blinking, or sleeping with eyelids closed.',
+        description: 'Person with eyes closed, squinting shut, or blinking with eyelids shut.',
       },
       {
         label: 'fail_sunglasses',
-        description: 'Eyes are hidden behind dark tinted sunglasses or dark lenses.',
+        description: 'Person wearing dark sunglasses covering the eyes.',
       },
       {
         label: 'fail_looking_away',
-        description: 'Eyes looking sideways or away from the camera lens.',
+        description: 'Selfie of a person squinting, grimacing, or looking sideways away from the camera.',
       },
     ],
     optionDisplay: {
@@ -211,7 +207,7 @@ export const PASSPORT_RULES: PassportRule[] = [
       },
       {
         label: 'fail_smiling',
-        description: 'Smiling broadly, grinning, laughing, or showing teeth with an open mouth.',
+        description: 'Smiling broadly, grinning, grimacing, laughing, or showing teeth with an open mouth.',
       },
     ],
     optionDisplay: {
@@ -432,15 +428,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.72, topLabel: 'pass_frontal', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.2, topLabel: 'fail_closed', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.83, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.99, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.8, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.68, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.69, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.41, topLabel: 'pass_chest_up', failLabel: 'fail_macro_face' },
-      occupancy_70_percent: { passProb: 0.65, topLabel: 'pass_70_pct', failLabel: 'fail_too_small' },
+      full_face: { passProb: 0.856, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
+      eyes_open: { passProb: 0.748, topLabel: 'pass_open', failLabel: 'fail_closed' },
+      neutral_expression: { passProb: 0.878, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.978, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
+      shoulders_visible: { passProb: 0.806, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
+      hair_clear: { passProb: 0.878, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.945, topLabel: 'pass_bare_eyes', failLabel: 'fail_eyeglasses' },
+      framing_chest_up: { passProb: 0.686, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
+      occupancy_70_percent: { passProb: 0.972, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -477,15 +473,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.66, topLabel: 'pass_frontal', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.19, topLabel: 'fail_closed', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.77, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.96, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.74, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.65, topLabel: 'pass_hair_clear', failLabel: 'fail_hat_cap' },
-      no_glasses: { passProb: 0.63, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.49, topLabel: 'pass_chest_up', failLabel: 'fail_macro_face' },
-      occupancy_70_percent: { passProb: 0.46, topLabel: 'pass_70_pct', failLabel: 'fail_too_small' },
+      full_face: { passProb: 0.631, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
+      eyes_open: { passProb: 0.492, topLabel: 'pass_open', failLabel: 'fail_closed' },
+      neutral_expression: { passProb: 0.777, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.871, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
+      shoulders_visible: { passProb: 0.822, topLabel: 'pass_shoulders', failLabel: 'fail_angled_selfie' },
+      hair_clear: { passProb: 0.812, topLabel: 'pass_hair_clear', failLabel: 'fail_hat_cap' },
+      no_glasses: { passProb: 0.77, topLabel: 'pass_bare_eyes', failLabel: 'fail_eyeglasses' },
+      framing_chest_up: { passProb: 0.607, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
+      occupancy_70_percent: { passProb: 0.798, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -522,15 +518,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.31, topLabel: 'fail_distant', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.006, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      neutral_expression: { passProb: 0.03, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.79, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.1, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.63, topLabel: 'pass_hair_clear', failLabel: 'fail_hat_cap' },
-      no_glasses: { passProb: 0.011, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.45, topLabel: 'pass_chest_up', failLabel: 'fail_macro_face' },
-      occupancy_70_percent: { passProb: 0.31, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
+      full_face: { passProb: 0.349, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
+      eyes_open: { passProb: 0.009, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      neutral_expression: { passProb: 0.038, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.617, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
+      shoulders_visible: { passProb: 0.293, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
+      hair_clear: { passProb: 0.77, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.077, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      framing_chest_up: { passProb: 0.299, topLabel: 'fail_off_center', failLabel: 'fail_off_center' },
+      occupancy_70_percent: { passProb: 0.412, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -567,15 +563,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.32, topLabel: 'fail_distant', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.01, topLabel: 'fail_closed', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.66, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.7, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.2, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.014, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.56, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.2, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
-      occupancy_70_percent: { passProb: 0.25, topLabel: 'fail_too_small', failLabel: 'fail_too_small' },
+      full_face: { passProb: 0.331, topLabel: 'fail_distant', failLabel: 'fail_distant' },
+      eyes_open: { passProb: 0.079, topLabel: 'fail_closed', failLabel: 'fail_closed' },
+      neutral_expression: { passProb: 0.498, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.515, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
+      shoulders_visible: { passProb: 0.242, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
+      hair_clear: { passProb: 0.065, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.666, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
+      framing_chest_up: { passProb: 0.276, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
+      occupancy_70_percent: { passProb: 0.256, topLabel: 'fail_too_small', failLabel: 'fail_too_small' },
     },
   },
   {
@@ -612,15 +608,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.35, topLabel: 'fail_cropped', failLabel: 'fail_cropped' },
-      eyes_open: { passProb: 0.43, topLabel: 'pass_open', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.53, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.09, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.06, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.16, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.84, topLabel: 'pass_bare_eyes', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.05, topLabel: 'fail_macro_face', failLabel: 'fail_macro_face' },
-      occupancy_70_percent: { passProb: 0.2, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
+      full_face: { passProb: 0.48, topLabel: 'pass_frontal', failLabel: 'fail_cropped' },
+      eyes_open: { passProb: 0.177, topLabel: 'fail_looking_away', failLabel: 'fail_looking_away' },
+      neutral_expression: { passProb: 0.375, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.187, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
+      shoulders_visible: { passProb: 0.065, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
+      hair_clear: { passProb: 0.293, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.949, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
+      framing_chest_up: { passProb: 0.096, topLabel: 'fail_macro_face', failLabel: 'fail_macro_face' },
+      occupancy_70_percent: { passProb: 0.209, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -649,15 +645,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       faceInfo: { hasFace: false },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.27, topLabel: 'fail_distant', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.28, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      neutral_expression: { passProb: 0.52, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.001, topLabel: 'fail_outdoor_street', failLabel: 'fail_outdoor_street' },
-      shoulders_visible: { passProb: 0.29, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.05, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.08, topLabel: 'fail_eyeglasses', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.08, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
-      occupancy_70_percent: { passProb: 0.39, topLabel: 'fail_too_small', failLabel: 'fail_too_small' },
+      full_face: { passProb: 0.258, topLabel: 'fail_distant', failLabel: 'fail_distant' },
+      eyes_open: { passProb: 0.093, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      neutral_expression: { passProb: 0.391, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.0, topLabel: 'fail_outdoor_street', failLabel: 'fail_outdoor_street' },
+      shoulders_visible: { passProb: 0.504, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
+      hair_clear: { passProb: 0.094, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.176, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      framing_chest_up: { passProb: 0.072, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
+      occupancy_70_percent: { passProb: 0.307, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -699,15 +695,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.22, topLabel: 'fail_turned_tilted', failLabel: 'fail_turned_tilted' },
-      eyes_open: { passProb: 0.16, topLabel: 'fail_looking_away', failLabel: 'fail_looking_away' },
-      neutral_expression: { passProb: 0.08, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.07, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.03, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.72, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.015, topLabel: 'fail_eyeglasses', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.18, topLabel: 'fail_off_center', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.28, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
+      full_face: { passProb: 0.313, topLabel: 'fail_turned_tilted', failLabel: 'fail_turned_tilted' },
+      eyes_open: { passProb: 0.114, topLabel: 'fail_looking_away', failLabel: 'fail_looking_away' },
+      neutral_expression: { passProb: 0.058, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.081, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
+      shoulders_visible: { passProb: 0.294, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
+      hair_clear: { passProb: 0.293, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
+      no_glasses: { passProb: 0.121, topLabel: 'fail_eyeglasses', failLabel: 'fail_eyeglasses' },
+      framing_chest_up: { passProb: 0.14, topLabel: 'fail_off_center', failLabel: 'fail_off_center' },
+      occupancy_70_percent: { passProb: 0.15, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
     },
   },
   {
@@ -736,15 +732,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       faceInfo: { hasFace: false },
     },
     rawEg2Vision: {
-      full_face: { passProb: 0.09, topLabel: 'fail_masked', failLabel: 'fail_masked' },
-      eyes_open: { passProb: 0.4, topLabel: 'pass_open', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.43, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.62, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.16, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.18, topLabel: 'fail_hat_cap', failLabel: 'fail_hat_cap' },
-      no_glasses: { passProb: 0.22, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.06, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
-      occupancy_70_percent: { passProb: 0.32, topLabel: 'fail_too_small', failLabel: 'fail_too_small' },
+      full_face: { passProb: 0.14, topLabel: 'fail_masked', failLabel: 'fail_masked' },
+      eyes_open: { passProb: 0.304, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      neutral_expression: { passProb: 0.576, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
+      neutral_background: { passProb: 0.427, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
+      shoulders_visible: { passProb: 0.371, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
+      hair_clear: { passProb: 0.254, topLabel: 'fail_hat_cap', failLabel: 'fail_hat_cap' },
+      no_glasses: { passProb: 0.281, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
+      framing_chest_up: { passProb: 0.527, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
+      occupancy_70_percent: { passProb: 0.784, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
     },
   },
 ];
@@ -764,8 +760,6 @@ export class DecisionVisionPlayground {
   private ruleExemplarBank: Record<string, { positives: ExemplarEntry[]; negatives: ExemplarEntry[] }> = {};
   private modelState: VisionModelState = { ready: false, loading: false, label: '' };
 
-  private faceLandmarker: FaceLandmarker | null = null;
-  private faceLandmarkerPromise: Promise<FaceLandmarker> | null = null;
   private webcamActive = false;
   private webcamStream: MediaStream | null = null;
   private liveLoopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -775,7 +769,8 @@ export class DecisionVisionPlayground {
   constructor(
     private root: HTMLElement,
     private ask?: VisionAskFn,
-    private onStatus?: (text: string, inferenceTime?: number) => void
+    private onStatus?: (text: string, inferenceTime?: number) => void,
+    private ensureVisionModel?: () => Promise<boolean>
   ) {
     this.liveFrameCanvas.width = 360;
     this.liveFrameCanvas.height = 460;
@@ -841,6 +836,7 @@ export class DecisionVisionPlayground {
         id: rule.id,
         type: 'categorical',
         prompt: rule.prompt,
+        normalizePrior: true,
         options: rule.options.map((opt) => ({
           label: opt.label,
           description: opt.description,
@@ -902,6 +898,9 @@ export class DecisionVisionPlayground {
     source: HTMLImageElement | HTMLCanvasElement,
     fallback?: Record<string, RawRuleVisionScore>
   ): Promise<{ rawEg2Vision: Record<string, RawRuleVisionScore>; inferenceTime?: number } | null> {
+    if (!this.isVisionModelReady() && this.ensureVisionModel) {
+      await this.ensureVisionModel();
+    }
     if (!this.isVisionModelReady() || !this.ask) return null;
     try {
       const imageBytes = await this.sourceToImageBytes(source);
@@ -966,13 +965,6 @@ export class DecisionVisionPlayground {
 
   cleanup() {
     this.stopWebcamBooth();
-    if (this.faceLandmarker) {
-      try {
-        this.faceLandmarker.close();
-      } catch (_) {}
-      this.faceLandmarker = null;
-      this.faceLandmarkerPromise = null;
-    }
   }
 
   public selectPresetPhoto(photoId: string) {
@@ -1038,16 +1030,17 @@ export class DecisionVisionPlayground {
 
         let posWeight = 0;
         for (const e of activePos) {
-          const d2 = this.l2DistSq(queryLogitVec, e.logitVec) + 2.0 * (rawL - e.logitVal) ** 2;
+          const d2 = 0.35 * this.l2DistSq(queryLogitVec, e.logitVec) + 3.5 * (rawL - e.logitVal) ** 2;
           posWeight += Math.exp(-d2 / 2.5);
         }
         let negWeight = 0;
         for (const e of activeNeg) {
-          const d2 = this.l2DistSq(queryLogitVec, e.logitVec) + 2.0 * (rawL - e.logitVal) ** 2;
+          const d2 = 0.35 * this.l2DistSq(queryLogitVec, e.logitVec) + 3.5 * (rawL - e.logitVal) ** 2;
           negWeight += Math.exp(-d2 / 2.5);
         }
-        const knnProb = (posWeight + 1e-3 * sigmoid(linearLogit)) / (posWeight + negWeight + 1e-3);
-        calPassProb = 0.25 * sigmoid(linearLogit) + 0.75 * knnProb;
+        const linProb = sigmoid(linearLogit);
+        const knnProb = (posWeight + 0.05 * linProb) / (posWeight + negWeight + 0.05);
+        calPassProb = 0.45 * linProb + 0.55 * knnProb;
       } else if (activePos.length > 0) {
         const muPos = activePos.reduce((s, e) => s + e.logitVal, 0) / activePos.length;
         calPassProb = sigmoid((rawL - (muPos - 0.8)) * 2.0);
@@ -1290,15 +1283,13 @@ export class DecisionVisionPlayground {
     const fallbackTemplate = isPositive ? PRESET_PHOTOS[0].rawEg2Vision : PRESET_PHOTOS[2].rawEg2Vision;
     let rawEg2Vision = { ...fallbackTemplate };
 
-    if (this.isVisionModelReady()) {
-      const img = await new Promise<HTMLImageElement>((res) => {
-        const el = new Image();
-        el.onload = () => res(el);
-        el.src = dataUrl;
-      });
-      const dmEval = await this.evaluateSourceWithDecisionMaker(img, fallbackTemplate);
-      if (dmEval) rawEg2Vision = dmEval.rawEg2Vision;
-    }
+    const img = await new Promise<HTMLImageElement>((res) => {
+      const el = new Image();
+      el.onload = () => res(el);
+      el.src = dataUrl;
+    });
+    const dmEval = await this.evaluateSourceWithDecisionMaker(img, fallbackTemplate);
+    if (dmEval) rawEg2Vision = dmEval.rawEg2Vision;
 
     const rawProb = rawEg2Vision[ruleId]?.passProb ?? (isPositive ? 0.7 : 0.05);
     const entry: ExemplarEntry = {
@@ -1316,93 +1307,12 @@ export class DecisionVisionPlayground {
     this.renderAllPanels();
   }
 
-  private async ensureFaceLandmarker(): Promise<FaceLandmarker> {
-    if (this.faceLandmarker) return this.faceLandmarker;
-    if (this.faceLandmarkerPromise) return this.faceLandmarkerPromise;
-
-    this.faceLandmarkerPromise = (async () => {
-      const baseUrl = import.meta.env.BASE_URL || '/';
-      const formattedBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-      const wasmPath = new URL(`${formattedBase}wasm`, window.location.origin).href.replace(/\/$/, '');
-      const resolver = await FilesetResolver.forVisionTasks(wasmPath, true);
-      try {
-        this.faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
-          baseOptions: {
-            modelAssetPath: FACE_LANDMARKER_MODEL_URL,
-            delegate: 'GPU',
-          },
-          runningMode: 'IMAGE',
-          numFaces: 1,
-        });
-      } catch (_) {
-        this.faceLandmarker = await FaceLandmarker.createFromOptions(resolver, {
-          baseOptions: {
-            modelAssetPath: FACE_LANDMARKER_MODEL_URL,
-            delegate: 'CPU',
-          },
-          runningMode: 'IMAGE',
-          numFaces: 1,
-        });
-      }
-      return this.faceLandmarker;
-    })();
-
-    return this.faceLandmarkerPromise;
-  }
-
-  /**
-   * Detects the visual face bounding box strictly for rendering the SVG guide
-   * frame (`#dv-overlay-svg`). Does not participate in rule scoring.
-   */
-  private async extractBiometricsFromSource(source: HTMLImageElement | HTMLCanvasElement): Promise<PhotoBiometrics> {
-    let faceInfo: FaceBiometricInfo = { hasFace: false };
-    try {
-      const fl = await this.ensureFaceLandmarker();
-      const flRes = fl.detect(source);
-      if (flRes.faceLandmarks && flRes.faceLandmarks.length > 0) {
-        const lm = flRes.faceLandmarks[0];
-        let minX = 1;
-        let minY = 1;
-        let maxX = 0;
-        let maxY = 0;
-        for (const p of lm) {
-          if (p.x < minX) minX = p.x;
-          if (p.y < minY) minY = p.y;
-          if (p.x > maxX) maxX = p.x;
-          if (p.y > maxY) maxY = p.y;
-        }
-        faceInfo = {
-          hasFace: true,
-          minX,
-          minY,
-          maxX,
-          maxY,
-          centerX: Number(((minX + maxX) * 0.5).toFixed(3)),
-          centerY: Number(((minY + maxY) * 0.5).toFixed(3)),
-          faceW: maxX - minX,
-          faceH: maxY - minY,
-        };
-      }
-    } catch (e) {
-      console.warn('FaceLandmarker error:', e);
-    }
-
-    return {
-      bgLum: 240,
-      bgVar: 5,
-      isPlainWhiteBg: true,
-      fgRatio: 0.68,
-      bottomShoulderWidthRatio: 0.85,
-      faceInfo,
-    };
-  }
-
   private async evaluateCustomImageElement(img: HTMLImageElement, titleLabel: string) {
     const t0 = performance.now();
-    const [biometrics, dmEval] = await Promise.all([
-      this.extractBiometricsFromSource(img),
-      this.evaluateSourceWithDecisionMaker(img, PRESET_PHOTOS[0].rawEg2Vision),
-    ]);
+    if (this.el['dv-result-meta']) {
+      this.el['dv-result-meta'].textContent = 'Evaluating photo…';
+    }
+    const dmEval = await this.evaluateSourceWithDecisionMaker(img, PRESET_PHOTOS[0].rawEg2Vision);
     const rawEg2Vision: Record<string, RawRuleVisionScore> = dmEval
       ? dmEval.rawEg2Vision
       : { ...PRESET_PHOTOS[0].rawEg2Vision };
@@ -1413,7 +1323,14 @@ export class DecisionVisionPlayground {
       sub: 'Custom',
       isCompliant: false,
       url: img.src,
-      biometrics,
+      biometrics: {
+        bgLum: 240,
+        bgVar: 5,
+        isPlainWhiteBg: true,
+        fgRatio: 0.68,
+        bottomShoulderWidthRatio: 0.85,
+        faceInfo: { hasFace: false },
+      },
       rawEg2Vision,
     };
     this.renderPresetStrip();
@@ -1461,21 +1378,20 @@ export class DecisionVisionPlayground {
     if (video && video.readyState >= 2) {
       const t0 = performance.now();
       this.drawMirroredVideoToCanvas(video, this.liveFrameCanvas);
-      const [biometrics, dmEval] = await Promise.all([
-        this.extractBiometricsFromSource(this.liveFrameCanvas),
-        this.evaluateSourceWithDecisionMaker(this.liveFrameCanvas, this.currentPhotoObj.rawEg2Vision),
-      ]);
+      const dmEval = await this.evaluateSourceWithDecisionMaker(
+        this.liveFrameCanvas,
+        this.currentPhotoObj.rawEg2Vision
+      );
       if (!this.webcamActive) return;
 
-      this.currentPhotoObj.biometrics = biometrics;
       if (dmEval) {
         this.currentPhotoObj.rawEg2Vision = dmEval.rawEg2Vision;
-      }
-      this.renderAllPanels();
+        this.renderAllPanels();
 
-      const elapsed = Math.max(8, Math.round(dmEval?.inferenceTime ?? performance.now() - t0));
-      if (this.el['dv-result-meta']) {
-        this.el['dv-result-meta'].textContent = `Live · ${elapsed} ms`;
+        const elapsed = Math.max(8, Math.round(dmEval.inferenceTime ?? performance.now() - t0));
+        if (this.el['dv-result-meta']) {
+          this.el['dv-result-meta'].textContent = `Live · ${elapsed} ms`;
+        }
       }
     }
     if (this.webcamActive) {
@@ -1505,8 +1421,9 @@ export class DecisionVisionPlayground {
       if (this.el['dv-webcam-btn-label']) this.el['dv-webcam-btn-label'].textContent = 'Stop Live';
       this.el['dv-webcam-btn']?.classList.add('active');
       if (this.el['dv-snap-btn']) this.el['dv-snap-btn'].style.display = 'inline-flex';
+      if (this.el['dv-result-meta']) this.el['dv-result-meta'].textContent = 'Evaluating live frame…';
 
-      const rawEg2Vision: Record<string, RawRuleVisionScore> = { ...PRESET_PHOTOS[0].rawEg2Vision };
+      const rawEg2Vision: Record<string, RawRuleVisionScore> = { ...this.currentPhotoObj.rawEg2Vision };
       this.currentPhotoObj = {
         id: 'live_webcam',
         title: 'Live Camera',
@@ -1524,6 +1441,7 @@ export class DecisionVisionPlayground {
         rawEg2Vision,
       };
       this.renderPresetStrip();
+      this.renderActivePhotoView();
       this.runLiveWebcamLoop();
     } catch (err: any) {
       this.onStatus?.(`Webcam error: ${err?.message || err}`);

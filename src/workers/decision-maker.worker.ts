@@ -305,13 +305,14 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       const dm = this.taskInstance!;
       const questions = (schema.questions ?? []).map((q: any) => ({
         ...q,
-        prompt: this.isEmbeddingGemma ? '' : (q.prompt ?? ''),
+        prompt: q.prompt ?? '',
+        normalizePrior: q.normalizePrior ?? true,
       }));
       return dm.evaluate(
         { text: text ?? '', imageBytes },
         {
           ...schema,
-          context: this.isEmbeddingGemma ? '' : (schema.context ?? ''),
+          context: schema.context ?? '',
           questions,
         }
       );

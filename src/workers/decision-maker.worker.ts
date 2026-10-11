@@ -59,11 +59,9 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       maxNumTokens: 4096,
     });
 
-    // In @mediapipe/tasks-decision@1.1.0, synchronous embind execution (when using
-    // the CPU delegate) returns a direct value instead of a Promise, while
-    // decision_bundle.mjs calls `.then()` on the return value. Wrap the underlying
-    // Wasm methods with Promise.resolve() so both GPU and CPU delegates work seamlessly.
-    const wasmMod = (this.taskInstance as any)?.i?.h;
+    // If running against @mediapipe/tasks-decision@1.1.0 before 1.1.1 is published,
+    // wrap synchronous CPU embind calls in Promise.resolve().
+    const wasmMod = (this.taskInstance as any)?.o?.h ?? (this.taskInstance as any)?.i?.h;
     if (wasmMod) {
       for (const fn of [
         'evaluateBoolean',
@@ -188,24 +186,15 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       return { selectedKey: fallbackKey, probabilities: probs, lowSignal: true };
     }
 
-    if (hasImage) {
-      const wasmMod = (dm as any)?.i?.h;
-      const makerPtr = (dm as any)?.j;
-      if (wasmMod && makerPtr && typeof wasmMod.evaluateContextChoice === 'function') {
-        const instructions = this.isEmbeddingGemma ? '' : (question.instructions ?? '');
-        return wasmMod.evaluateContextChoice(makerPtr, text ?? '', criteria, question.options ?? [], 0, instructions, {
-          imageBytes,
-        });
-      }
-    }
+    const input = hasImage ? { text: text ?? '', imageBytes } : text;
 
     if (this.isEmbeddingGemma) {
-      return dm.evaluateChoice(text, {
+      return dm.evaluateChoice(input, {
         instructions: '',
         criteria,
       });
     }
-    return dm.evaluateChoice(text, {
+    return dm.evaluateChoice(input, {
       instructions: question.instructions,
       context: question.context,
       criteria,
@@ -314,21 +303,18 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
     const hasImage = Boolean(imageBytes && imageBytes.byteLength > 0);
     if (hasImage) {
       const dm = this.taskInstance!;
-      const wasmMod = (dm as any)?.i?.h;
-      const makerPtr = (dm as any)?.j;
-      if (wasmMod && makerPtr && typeof wasmMod.evaluateContextSchema === 'function') {
-        const questions = (schema.questions ?? []).map((q: any) => ({
-          ...q,
-          prompt: this.isEmbeddingGemma ? '' : (q.prompt ?? ''),
-        }));
-        return wasmMod.evaluateContextSchema(
-          makerPtr,
-          text ?? '',
-          this.isEmbeddingGemma ? '' : (schema.context ?? ''),
+      const questions = (schema.questions ?? []).map((q: any) => ({
+        ...q,
+        prompt: this.isEmbeddingGemma ? '' : (q.prompt ?? ''),
+      }));
+      return dm.evaluate(
+        { text: text ?? '', imageBytes },
+        {
+          ...schema,
+          context: this.isEmbeddingGemma ? '' : (schema.context ?? ''),
           questions,
-          { imageBytes }
-        );
-      }
+        }
+      );
     }
 
     const context: string | undefined = schema.context || undefined;

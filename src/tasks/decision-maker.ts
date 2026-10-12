@@ -27,8 +27,8 @@
 import template from '../templates/decision-maker.html?raw';
 import { InferenceTimer } from '../components/inference-timer';
 import { ViewToggle } from '../components/view-toggle';
-import { decisionRuntime } from '../components/decision-runtime';
-import { mountDecisionModelPanel } from '../components/decision-model-panel';
+import { DECISION_MODELS, decisionRuntime } from '../components/decision-runtime';
+import { mountDecisionModelPanel, type DecisionModelPanelHandle } from '../components/decision-model-panel';
 import { DecisionTextPlayground } from './decision-maker-text';
 import { DecisionVisionPlayground } from './decision-maker-vision';
 
@@ -37,6 +37,7 @@ class DecisionMakerTask {
   private inferenceTimer = new InferenceTimer();
   private textPlayground!: DecisionTextPlayground;
   private visionPlayground!: DecisionVisionPlayground;
+  private modelPanel?: DecisionModelPanelHandle;
   private mode: 'text' | 'vision' = 'text';
   private disposers: (() => void)[] = [];
   private el: Record<string, HTMLElement> = {};
@@ -93,10 +94,10 @@ class DecisionMakerTask {
         this.setMode(value as 'text' | 'vision');
       }
     );
-    this.setMode(this.mode);
-
     // Model controls and state are shared with the Dino Game page.
-    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel'], this.el['dm-delegate-panel']));
+    this.modelPanel = mountDecisionModelPanel(this.el['dm-model-panel'], this.el['dm-delegate-panel'], this.mode);
+    this.disposers.push(this.modelPanel);
+    this.setMode(this.mode);
     this.disposers.push(
       decisionRuntime.subscribe((event) => {
         if (event.type === 'loading') {
@@ -128,9 +129,14 @@ class DecisionMakerTask {
 
   private setMode(mode: 'text' | 'vision') {
     this.mode = mode;
+    this.modelPanel?.setModality(mode);
     if (mode !== 'vision') {
       this.visionPlayground.stopWebcamBooth();
-    } else if (!decisionRuntime.ready && !decisionRuntime.loading && !decisionRuntime.customModel) {
+    } else if (
+      !decisionRuntime.customModel &&
+      ((!decisionRuntime.ready && !decisionRuntime.loading) ||
+        (decisionRuntime.loadedValue && !DECISION_MODELS[decisionRuntime.loadedValue]?.supportsVision))
+    ) {
       decisionRuntime.select('embeddinggemma2_text_vision_440m');
       void decisionRuntime.load();
     }

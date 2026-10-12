@@ -1354,7 +1354,7 @@ export class DecisionVisionPlayground {
       this.webcamActive = true;
       imgEl.style.display = 'none';
       video.style.display = 'block';
-      if (this.el['dv-webcam-btn-label']) this.el['dv-webcam-btn-label'].textContent = 'Stop Live';
+      if (this.el['dv-webcam-btn-label']) this.el['dv-webcam-btn-label'].textContent = 'Stop Webcam';
       this.el['dv-webcam-btn']?.classList.add('active');
       if (this.el['dv-snap-btn']) this.el['dv-snap-btn'].style.display = 'inline-flex';
       if (this.el['dv-result-meta']) this.el['dv-result-meta'].textContent = 'Evaluating live frame…';
@@ -1398,7 +1398,7 @@ export class DecisionVisionPlayground {
     const imgEl = this.el['dv-main-img'] as HTMLImageElement | undefined;
     if (video) video.style.display = 'none';
     if (imgEl) imgEl.style.display = 'block';
-    if (this.el['dv-webcam-btn-label']) this.el['dv-webcam-btn-label'].textContent = 'Live Check';
+    if (this.el['dv-webcam-btn-label']) this.el['dv-webcam-btn-label'].textContent = 'Webcam';
     this.el['dv-webcam-btn']?.classList.remove('active');
     if (this.el['dv-snap-btn']) this.el['dv-snap-btn'].style.display = 'none';
     if (this.el['dv-result-meta']) this.el['dv-result-meta'].textContent = '9/9 rules';

@@ -41,25 +41,47 @@ const DELEGATE_HTML = `
     </div>
   </div>`;
 
+export type DecisionModelPanelHandle = (() => void) & {
+  setModality: (modality: 'text' | 'vision') => void;
+};
+
 /**
  * Renders the model controls into `modelContainer` and the delegate select into
  * `delegateContainer`, wired to decisionRuntime. Returns a cleanup function.
  */
-export function mountDecisionModelPanel(modelContainer: HTMLElement, delegateContainer: HTMLElement): () => void {
+export function mountDecisionModelPanel(
+  modelContainer: HTMLElement,
+  delegateContainer: HTMLElement,
+  initialModality: 'text' | 'vision' = 'text'
+): DecisionModelPanelHandle {
   modelContainer.innerHTML = MODEL_PANEL_HTML;
   delegateContainer.innerHTML = DELEGATE_HTML;
   const delegateSelect = delegateContainer.querySelector<HTMLSelectElement>('#delegate-select')!;
+
+  const getOptionsForModality = (modality: 'text' | 'vision') => {
+    const entries = Object.entries(DECISION_MODELS).filter(
+      ([, m]) => !m.unsupported && (modality !== 'vision' || Boolean(m.supportsVision))
+    );
+    if (
+      modality === 'vision' &&
+      !entries.some(([value]) => value === decisionRuntime.modelName) &&
+      entries.length > 0
+    ) {
+      decisionRuntime.modelName = entries[0][0];
+    }
+    return entries.map(([value, m]) => ({
+      value,
+      label: m.label,
+      isDefault: value === decisionRuntime.modelName,
+      disabled: m.unsupported,
+    }));
+  };
 
   // Enhanced ModelSelector now natively handles the "Load Model" (Initialize Task) button,
   // file upload accept tags, caching indicators, and progress streaming.
   const selector = new ModelSelector(
     'model-selector-container',
-    Object.entries(DECISION_MODELS).map(([value, m]) => ({
-      value,
-      label: m.label,
-      isDefault: value === decisionRuntime.modelName,
-      disabled: m.unsupported,
-    })),
+    getOptionsForModality(initialModality),
     (selection: ModelSelection) => {
       // With autoLoad: false, this is called when the user explicitly clicks the load button
       // or selects a file. We just update the state and call load().
@@ -114,5 +136,11 @@ export function mountDecisionModelPanel(modelContainer: HTMLElement, delegateCon
     } else if (event.type === 'state') renderState();
   });
   renderState();
-  return unsubscribe;
+
+  const handle = (() => unsubscribe()) as DecisionModelPanelHandle;
+  handle.setModality = (modality: 'text' | 'vision') => {
+    selector.updateOptions(getOptionsForModality(modality));
+    renderState();
+  };
+  return handle;
 }

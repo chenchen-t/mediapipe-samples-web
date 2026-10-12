@@ -102,6 +102,13 @@ class DecisionMakerTask {
         if (event.type === 'loading') {
           this.inferenceTimer.resetRollingWindow();
           this.lastLoadError = undefined;
+        } else if (event.type === 'progress') {
+          const pct = event.total > 0 ? Math.min(100, Math.round((event.loaded / event.total) * 100)) : 0;
+          const loadedMB = (event.loaded / 1048576).toFixed(0);
+          const totalMB = event.total > 0 ? (event.total / 1048576).toFixed(0) : '?';
+          this.setStatus(`Loading ${decisionRuntime.loadingLabel}... ${pct}% (${loadedMB}/${totalMB} MB)`);
+          this.visionPlayground.setLoadProgress(event.loaded, event.total);
+          return;
         } else if (event.type === 'status') {
           this.setStatus(event.text);
         } else if (event.type === 'error') {
@@ -125,6 +132,7 @@ class DecisionMakerTask {
       this.visionPlayground.stopWebcamBooth();
     } else if (!decisionRuntime.ready && !decisionRuntime.loading && !decisionRuntime.customModel) {
       decisionRuntime.select('embeddinggemma2_text_vision_440m');
+      void decisionRuntime.load();
     }
     this.el['dm-text-view'].style.display = mode === 'text' ? '' : 'none';
     this.el['dm-vision-view'].style.display = mode === 'vision' ? '' : 'none';

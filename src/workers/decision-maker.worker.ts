@@ -17,6 +17,30 @@
 import { DecisionMaker, FilesetResolver } from '@mediapipe/tasks-decision';
 import { BaseWorker } from './base-worker';
 
+function shouldSuppressCppLog(args: unknown[]): boolean {
+  const first = typeof args[0] === 'string' ? args[0].trimStart() : '';
+  return (
+    first.startsWith('INFO:') ||
+    first.startsWith('VERBOSE:') ||
+    first.startsWith('WARNING:') ||
+    first.startsWith('I0000 ') ||
+    first.startsWith('W0000 ')
+  );
+}
+
+const origConsoleError = console.error.bind(console);
+const origConsoleWarn = console.warn.bind(console);
+const origConsoleLog = console.log.bind(console);
+console.error = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleError(...args);
+};
+console.warn = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleWarn(...args);
+};
+console.log = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleLog(...args);
+};
+
 const DEFAULT_TRUE_DESC = 'yes, the statement holds';
 const DEFAULT_FALSE_DESC = 'no, the statement does not hold';
 
@@ -39,12 +63,17 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
 
   protected async initializeTask(): Promise<void> {
     const fileset = await FilesetResolver.forDecisionTasks(this.getWasmPath(), true);
-    fileset.wasmLoaderPath = `${fileset.wasmLoaderPath}?cb=${Date.now()}`; // Force reload
+    const cb = Date.now();
+    fileset.wasmLoaderPath = `${fileset.wasmLoaderPath}?cb=${cb}`;
+    fileset.wasmBinaryPath = `${fileset.wasmBinaryPath}?cb=${cb}`;
 
     const file: File | undefined = this.currentOptions.modelFile;
     const url: string = this.currentOptions.modelAssetPath ?? '';
     const modelNameHint = `${file?.name ?? ''} ${url}`.toLowerCase();
     this.isEmbeddingGemma = modelNameHint.includes('embeddinggemma') || modelNameHint.endsWith('.litertlm');
+    const isVisionLiteRtLm =
+      modelNameHint.endsWith('.litertlm') &&
+      (modelNameHint.includes('vision') || modelNameHint.includes('435m') || modelNameHint.includes('440m'));
 
     // Stream the model (cached download or uploaded file) so it isn't copied
     // into one big JS buffer; the size lets the wasm allocate it in one pass.
@@ -55,14 +84,18 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
         delegate: this.currentOptions.delegate === 'GPU' ? 'GPU' : 'CPU',
       },
       ...(size ? { modelAssetSize: size } : {}),
-      // Same as the Android sample; the default (256) is too small for longer inputs.
-      maxNumTokens: 4096,
+      // Vision .litertlm rules fit well within 256 tokens; avoiding 4096 skips
+      // compiling extra text encoder signature buckets during initialization.
+      maxNumTokens: isVisionLiteRtLm ? 256 : 4096,
     });
 
-    // If running against @mediapipe/tasks-decision@1.1.0 before 1.1.1 is published,
-    // wrap synchronous CPU embind calls in Promise.resolve().
-    const wasmMod = (this.taskInstance as any)?.o?.h ?? (this.taskInstance as any)?.i?.h;
+    // Serialize all asyncify Wasm calls through a per-module promise queue so
+    // concurrent evaluate/prewarm calls never re-enter a suspended Wasm stack
+    // while holding absl::Mutex.
+    const wasmMod =
+      (this.taskInstance as any)?.j?.h ?? (this.taskInstance as any)?.o?.h ?? (this.taskInstance as any)?.i?.h;
     if (wasmMod) {
+      if (!wasmMod._callQueue) wasmMod._callQueue = Promise.resolve();
       for (const fn of [
         'evaluateBoolean',
         'evaluateChoice',
@@ -76,7 +109,14 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       ]) {
         if (typeof wasmMod[fn] === 'function' && !wasmMod[fn]._promised) {
           const orig = wasmMod[fn].bind(wasmMod);
-          wasmMod[fn] = (...args: any[]) => Promise.resolve(orig(...args));
+          wasmMod[fn] = (...args: any[]) => {
+            const next = wasmMod._callQueue.then(() => Promise.resolve(orig(...args)));
+            wasmMod._callQueue = next.then(
+              () => {},
+              () => {}
+            );
+            return next;
+          };
           wasmMod[fn]._promised = true;
         }
       }

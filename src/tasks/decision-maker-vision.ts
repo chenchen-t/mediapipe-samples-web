@@ -34,6 +34,7 @@ export interface PassportRule {
   icon: string;
   shortTitle: string;
   title: string;
+  normalizePrior?: boolean;
   prompt: string;
   options: PassportRuleOption[];
   optionDisplay: Record<string, string>;
@@ -79,7 +80,8 @@ export interface PhotoPreset {
   id: string;
   title: string;
   sub: string;
-  isCompliant: boolean;
+  isCompliant: boolean | null;
+  evaluated?: boolean;
   url: string;
   groundTruth?: Record<string, boolean>;
   biometrics: PhotoBiometrics;
@@ -97,6 +99,7 @@ export interface ExemplarEntry {
 }
 
 export interface RuleEvalResult {
+  pending?: boolean;
   passed: boolean;
   prob: number;
   rawPassProb: number;
@@ -125,40 +128,25 @@ export const PASSPORT_RULES: PassportRule[] = [
     id: 'full_face',
     num: 1,
     icon: 'face',
-    shortTitle: 'Full Face',
-    title: '1. Full Face Present',
-    prompt: 'Is a complete, unobstructed, centered frontal face present inside the frame?',
+    shortTitle: 'Head in Frame',
+    title: '1. Head Inside Frame',
+    normalizePrior: false,
+    prompt: "Is the person's full head visible without being cut off at the top or bottom?",
     options: [
       {
         label: 'pass_frontal',
         description:
-          'Complete unobstructed frontal portrait face centered in frame with full forehead, chin, nose, and mouth clearly visible.',
+          'Head and shoulders portrait of a man or woman with hair, chin, and neck visible.',
       },
       {
         label: 'fail_cropped',
-        description: 'Extreme close-up face with forehead or chin cut off at the edges of the image.',
-      },
-      {
-        label: 'fail_masked',
-        description: 'Face covered by a black face mask, respirator, cloth covering, or hand.',
-      },
-      {
-        label: 'fail_distant',
-        description: 'Distant person standing far away so the face is tiny.',
-      },
-      {
-        label: 'fail_turned_tilted',
-        description: 'Off-center, tilted, or angled head posture not facing straight ahead.',
+        description:
+          'Tightly cropped macro close-up of skin, nose, and eyes filling the entire image with no neck or hair.',
       },
     ],
     optionDisplay: {
-      pass_frontal: 'Centered & straight frontal',
-      fail_off_center_and_tilted: 'Off-center & head tilted',
-      fail_off_center: 'Off-center in frame',
-      fail_turned_tilted: 'Head turned or tilted',
+      pass_frontal: 'Full head & chin in frame',
       fail_cropped: 'Head/chin clipped at edge',
-      fail_masked: 'Face covered by mask',
-      fail_distant: 'Subject too far away',
     },
   },
   {
@@ -167,28 +155,24 @@ export const PASSPORT_RULES: PassportRule[] = [
     icon: 'visibility',
     shortTitle: 'Eyes Open',
     title: '2. Eyes Open & Direct',
-    prompt: 'Are both eyes open and looking straight ahead at the camera?',
+    normalizePrior: false,
+    prompt: "Are the person's eyes open?",
     options: [
       {
         label: 'pass_open',
-        description: 'Passport portrait of a person with both eyes open looking straight ahead at the camera.',
+        description: 'Person with eyes open looking at the camera.',
       },
       {
         label: 'fail_closed',
-        description: 'Person with eyes closed, squinting shut, or blinking with eyelids shut.',
+        description: 'Woman with both eyes closed shut, sleeping or blinking with eyelids closed.',
       },
       {
         label: 'fail_sunglasses',
-        description: 'Person wearing dark sunglasses covering the eyes.',
-      },
-      {
-        label: 'fail_looking_away',
-        description: 'Selfie of a person squinting, grimacing, or looking sideways away from the camera.',
+        description: 'Person wearing dark black sunglasses covering the eyes.',
       },
     ],
     optionDisplay: {
       pass_open: 'Open & looking at camera',
-      fail_looking_away: 'Not looking straight at camera',
       fail_closed: 'Eyes closed / blinking',
       fail_sunglasses: 'Hidden behind dark lenses',
     },
@@ -199,7 +183,8 @@ export const PASSPORT_RULES: PassportRule[] = [
     icon: 'sentiment_neutral',
     shortTitle: 'Neutral Face',
     title: '3. Neutral Expression',
-    prompt: 'Does the person have a calm, neutral facial expression with mouth closed?',
+    normalizePrior: false,
+    prompt: 'Does the person have a calm, neutral expression with mouth closed?',
     options: [
       {
         label: 'pass_neutral',
@@ -207,7 +192,7 @@ export const PASSPORT_RULES: PassportRule[] = [
       },
       {
         label: 'fail_smiling',
-        description: 'Smiling broadly, grinning, grimacing, laughing, or showing teeth with an open mouth.',
+        description: 'Happy person grinning and smiling broadly showing white teeth.',
       },
     ],
     optionDisplay: {
@@ -219,55 +204,51 @@ export const PASSPORT_RULES: PassportRule[] = [
     id: 'neutral_background',
     num: 4,
     icon: 'crop_portrait',
-    shortTitle: 'White BG',
-    title: '4. Neutral White Background',
-    prompt: 'Is the background a plain, uniform white or off-white studio backdrop?',
+    shortTitle: 'Plain BG',
+    title: '4. Plain Neutral Background',
+    normalizePrior: true,
+    prompt: 'Is the background a plain, simple wall or backdrop?',
     options: [
       {
         label: 'pass_white_bg',
-        description: 'Plain, uniform, solid white studio background backdrop.',
-      },
-      {
-        label: 'fail_indoor_clutter',
-        description: 'Busy indoor room background showing bookshelves, doors, furniture, or walls.',
+        description: 'Indoor portrait against a plain wall, simple neutral wall, or solid white studio background.',
       },
       {
         label: 'fail_outdoor_street',
-        description: 'Busy outdoor street scene with trees, buildings, sky, bicycles, or pedestrians.',
+        description: 'Outdoor street scene with green trees, autumn leaves, buildings, and sky in the background.',
+      },
+      {
+        label: 'fail_indoor_clutter',
+        description: 'Cluttered room background filled with bookshelves, books, and household items.',
       },
     ],
     optionDisplay: {
-      pass_white_bg: 'Plain uniform white backdrop',
-      fail_indoor_clutter: 'Indoor room background',
+      pass_white_bg: 'Plain wall / backdrop',
+      fail_indoor_clutter: 'Cluttered room background',
       fail_outdoor_street: 'Outdoor street background',
     },
   },
   {
     id: 'shoulders_visible',
     num: 5,
-    icon: 'checkroom',
-    shortTitle: 'Shoulders',
-    title: '5. Shoulders Visible & Square',
-    prompt: 'Are both upper shoulders clearly visible and symmetrical at the bottom?',
+    icon: 'center_focus_strong',
+    shortTitle: 'Straight Pose',
+    title: '5. Straight Frontal Pose',
+    normalizePrior: false,
+    prompt: 'Is the head held straight and upright facing the camera?',
     options: [
       {
         label: 'pass_shoulders',
-        description:
-          'Both left and right upper shoulders in suit jacket or shirt are symmetrical and visible at the bottom of the portrait.',
-      },
-      {
-        label: 'fail_no_shoulders',
-        description: 'Extreme face-only macro close-up cropped at the chin with zero neck and zero shoulders visible.',
+        description: 'Upright frontal portrait of a person with head straight and level.',
       },
       {
         label: 'fail_angled_selfie',
-        description: 'Angled one-handed selfie posture with one arm extended toward the camera.',
+        description: 'Angled selfie with head tilted sideways and leaning to one side.',
       },
     ],
     optionDisplay: {
-      pass_shoulders: 'Both shoulders visible',
-      fail_no_shoulders: 'Cropped at chin (no shoulders)',
-      fail_angled_selfie: 'Angled selfie posture',
+      pass_shoulders: 'Upright & level head pose',
+      fail_angled_selfie: 'Head tilted sideways',
     },
   },
   {
@@ -275,27 +256,22 @@ export const PASSPORT_RULES: PassportRule[] = [
     num: 6,
     icon: 'content_cut',
     shortTitle: 'Hair Clear',
-    title: '6. Hair Not Covering Face',
-    prompt: 'Is the hair neat and clear of the face, eyebrows, and eyes, with no hat?',
+    title: '6. Hair Clear of Eyes',
+    normalizePrior: false,
+    prompt: 'Are the eyes clear of hair bangs?',
     options: [
       {
         label: 'pass_hair_clear',
-        description:
-          'Neat hair tucked behind ears or short hair with forehead, both eyebrows, and both eyes completely clear and visible.',
+        description: "Portrait where the person's eyes and face are clearly visible and not covered by bangs.",
       },
       {
         label: 'fail_bangs_over_eyes',
-        description: 'Long messy hair bangs hanging down covering the forehead, eyebrows, and eyes.',
-      },
-      {
-        label: 'fail_hat_cap',
-        description: 'Wearing a hat, cap, or headgear covering the head.',
+        description: 'Long messy hair bangs hanging down across the forehead and covering the eyes.',
       },
     ],
     optionDisplay: {
-      pass_hair_clear: 'Face & eyebrows unobstructed',
+      pass_hair_clear: 'Eyes & brow unobstructed',
       fail_bangs_over_eyes: 'Bangs covering eyes/brow',
-      fail_hat_cap: 'Hat / cap worn',
     },
   },
   {
@@ -304,19 +280,20 @@ export const PASSPORT_RULES: PassportRule[] = [
     icon: 'visibility_off',
     shortTitle: 'No Glasses',
     title: '7. No Eyeglasses or Sunglasses',
-    prompt: 'Are the eyes bare and free of eyeglasses or sunglasses?',
+    normalizePrior: false,
+    prompt: 'Are the eyes bare and unobstructed by lenses?',
     options: [
       {
         label: 'pass_bare_eyes',
-        description: 'Bare natural face and eyes with clear skin around the eyes and bridge of the nose.',
+        description: 'Close-up portrait of a person with bare eyes, eyebrows, and nose.',
       },
       {
         label: 'fail_eyeglasses',
-        description: 'Wearing prescription eyeglasses, reading glasses, or optical frames over the eyes.',
+        description: 'Eyeglass frames and corrective spectacle lenses worn over the eyes.',
       },
       {
         label: 'fail_sunglasses',
-        description: 'Wearing dark tinted sunglasses with black frames covering the eyes.',
+        description: 'Dark black sunglasses with opaque tinted lenses worn over the eyes.',
       },
     ],
     optionDisplay: {
@@ -328,61 +305,47 @@ export const PASSPORT_RULES: PassportRule[] = [
   {
     id: 'framing_chest_up',
     num: 8,
-    icon: 'aspect_ratio',
-    shortTitle: 'Chest-Up',
-    title: '8. Close-Up to Upper Chest',
-    prompt: 'Is the photo framed as a head-and-shoulders close-up down to the upper chest?',
+    icon: 'masks',
+    shortTitle: 'No Mask/Cap',
+    title: '8. Uncovered Face & Head',
+    normalizePrior: false,
+    prompt: 'Is the lower face uncovered (no mask or cap)?',
     options: [
       {
         label: 'pass_chest_up',
-        description: 'Standard passport head-and-shoulders bust portrait cropped at the upper chest and collarbone.',
+        description: 'Person with visible nose, mouth, lips, and chin, and bare hair with no cap or mask.',
       },
       {
-        label: 'fail_full_body',
-        description: 'Wide full-body shot showing waist, stomach, jeans, legs, or arms far below the chest.',
-      },
-      {
-        label: 'fail_macro_face',
-        description: 'Extreme macro close-up of the face only, cropped at the chin without neck or chest.',
-      },
-      {
-        label: 'fail_off_center',
-        description: 'Off-center or tilted framing not aligned in the center of the portrait.',
+        label: 'fail_mask_hat',
+        description: 'Face hidden behind a protective face mask covering nose and mouth and wearing a cap.',
       },
     ],
     optionDisplay: {
-      pass_chest_up: 'Head & upper chest framing',
-      fail_off_center: 'Not centered in guide oval',
-      fail_full_body: 'Shows waist/body below chest',
-      fail_macro_face: 'Zoomed too close (face only)',
+      pass_chest_up: 'No mask, cap, or hat',
+      fail_mask_hat: 'Mask or cap covering face/head',
     },
   },
   {
     id: 'occupancy_70_percent',
     num: 9,
     icon: 'photo_size_select_large',
-    shortTitle: '~70% Frame',
-    title: '9. Occupies ~70% of Photo',
-    prompt: 'Does the person occupy approximately 70% of the photo frame?',
+    shortTitle: 'Good Distance',
+    title: '9. Proper Portrait Distance',
+    normalizePrior: false,
+    prompt: 'Is the subject close enough to the camera (not standing far away)?',
     options: [
       {
         label: 'pass_70_pct',
-        description:
-          'Well-proportioned passport bust portrait where head and shoulders fill 70% of the frame with white margin above the head.',
+        description: "Close-up headshot portrait of a person's face filling the frame.",
       },
       {
         label: 'fail_too_small',
-        description: 'Distant small person occupying less than 35% of the frame.',
-      },
-      {
-        label: 'fail_too_large',
-        description: 'Zoomed-in giant face filling 98% of the frame with cut-off edges.',
+        description: 'Distant person standing far away outdoors on a street with trees and buildings.',
       },
     ],
     optionDisplay: {
-      pass_70_pct: 'Subject fills ~70% of frame',
-      fail_too_small: 'Too small in frame (<35%)',
-      fail_too_large: 'Overfills frame (>90%)',
+      pass_70_pct: 'Good close-up portrait scale',
+      fail_too_small: 'Subject too far from camera',
     },
   },
 ];
@@ -397,20 +360,10 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
   {
     id: 'passport_compliant_female.jpg',
     title: 'Compliant #1',
-    sub: '9/9 Pass',
-    isCompliant: true,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('passport_compliant_female.jpg'),
-    groundTruth: {
-      full_face: true,
-      eyes_open: true,
-      neutral_expression: true,
-      neutral_background: true,
-      shoulders_visible: true,
-      hair_clear: true,
-      no_glasses: true,
-      framing_chest_up: true,
-      occupancy_70_percent: true,
-    },
     biometrics: {
       bgLum: 251,
       bgVar: 2,
@@ -427,35 +380,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.385,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.856, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
-      eyes_open: { passProb: 0.748, topLabel: 'pass_open', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.878, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.978, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.806, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.878, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.945, topLabel: 'pass_bare_eyes', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.686, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.972, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'passport_compliant_male.jpg',
     title: 'Compliant #2',
-    sub: '9/9 Pass',
-    isCompliant: true,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('passport_compliant_male.jpg'),
-    groundTruth: {
-      full_face: true,
-      eyes_open: true,
-      neutral_expression: true,
-      neutral_background: true,
-      shoulders_visible: true,
-      hair_clear: true,
-      no_glasses: true,
-      framing_chest_up: true,
-      occupancy_70_percent: true,
-    },
     biometrics: {
       bgLum: 249,
       bgVar: 3,
@@ -472,35 +405,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.379,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.631, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
-      eyes_open: { passProb: 0.492, topLabel: 'pass_open', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.777, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.871, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
-      shoulders_visible: { passProb: 0.822, topLabel: 'pass_shoulders', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.812, topLabel: 'pass_hair_clear', failLabel: 'fail_hat_cap' },
-      no_glasses: { passProb: 0.77, topLabel: 'pass_bare_eyes', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.607, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.798, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_glasses_smile.jpg',
     title: 'Sunglasses',
-    sub: '3 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_glasses_smile.jpg'),
-    groundTruth: {
-      full_face: true,
-      eyes_open: false,
-      neutral_expression: false,
-      neutral_background: true,
-      shoulders_visible: true,
-      hair_clear: true,
-      no_glasses: false,
-      framing_chest_up: true,
-      occupancy_70_percent: true,
-    },
     biometrics: {
       bgLum: 242,
       bgVar: 3,
@@ -517,35 +430,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.386,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.349, topLabel: 'pass_frontal', failLabel: 'fail_turned_tilted' },
-      eyes_open: { passProb: 0.009, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      neutral_expression: { passProb: 0.038, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.617, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
-      shoulders_visible: { passProb: 0.293, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.77, topLabel: 'pass_hair_clear', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.077, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.299, topLabel: 'fail_off_center', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.412, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_eyes_closed_hair.jpg',
     title: 'Eyes Closed',
-    sub: '2 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_eyes_closed_hair.jpg'),
-    groundTruth: {
-      full_face: true,
-      eyes_open: false,
-      neutral_expression: true,
-      neutral_background: true,
-      shoulders_visible: true,
-      hair_clear: false,
-      no_glasses: true,
-      framing_chest_up: true,
-      occupancy_70_percent: true,
-    },
     biometrics: {
       bgLum: 232,
       bgVar: 10,
@@ -562,35 +455,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.283,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.331, topLabel: 'fail_distant', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.079, topLabel: 'fail_closed', failLabel: 'fail_closed' },
-      neutral_expression: { passProb: 0.498, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.515, topLabel: 'pass_white_bg', failLabel: 'fail_outdoor_street' },
-      shoulders_visible: { passProb: 0.242, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.065, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.666, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.276, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
-      occupancy_70_percent: { passProb: 0.256, topLabel: 'fail_too_small', failLabel: 'fail_too_small' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_extreme_zoom_cropped.jpg',
     title: 'Too Close',
-    sub: '5 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_extreme_zoom_cropped.jpg'),
-    groundTruth: {
-      full_face: false,
-      eyes_open: true,
-      neutral_expression: true,
-      neutral_background: false,
-      shoulders_visible: false,
-      hair_clear: true,
-      no_glasses: true,
-      framing_chest_up: false,
-      occupancy_70_percent: false,
-    },
     biometrics: {
       bgLum: 105,
       bgVar: 83,
@@ -607,35 +480,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         faceH: 0.888,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.48, topLabel: 'pass_frontal', failLabel: 'fail_cropped' },
-      eyes_open: { passProb: 0.177, topLabel: 'fail_looking_away', failLabel: 'fail_looking_away' },
-      neutral_expression: { passProb: 0.375, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.187, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.065, topLabel: 'fail_no_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.293, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.949, topLabel: 'pass_bare_eyes', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.096, topLabel: 'fail_macro_face', failLabel: 'fail_macro_face' },
-      occupancy_70_percent: { passProb: 0.209, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_distant_waist_up.jpg',
     title: 'Too Far',
-    sub: '4 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_distant_waist_up.jpg'),
-    groundTruth: {
-      full_face: false,
-      eyes_open: true,
-      neutral_expression: true,
-      neutral_background: false,
-      shoulders_visible: true,
-      hair_clear: true,
-      no_glasses: true,
-      framing_chest_up: false,
-      occupancy_70_percent: false,
-    },
     biometrics: {
       bgLum: 169,
       bgVar: 93,
@@ -644,35 +497,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       bottomShoulderWidthRatio: 0.8,
       faceInfo: { hasFace: false },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.258, topLabel: 'fail_distant', failLabel: 'fail_distant' },
-      eyes_open: { passProb: 0.093, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      neutral_expression: { passProb: 0.391, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.0, topLabel: 'fail_outdoor_street', failLabel: 'fail_outdoor_street' },
-      shoulders_visible: { passProb: 0.504, topLabel: 'pass_shoulders', failLabel: 'fail_no_shoulders' },
-      hair_clear: { passProb: 0.094, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.176, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.072, topLabel: 'fail_full_body', failLabel: 'fail_full_body' },
-      occupancy_70_percent: { passProb: 0.307, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_tilted_glasses_selfie.jpg',
     title: 'Tilted Selfie',
-    sub: '8 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_tilted_glasses_selfie.jpg'),
-    groundTruth: {
-      full_face: false,
-      eyes_open: false,
-      neutral_expression: false,
-      neutral_background: false,
-      shoulders_visible: false,
-      hair_clear: true,
-      no_glasses: false,
-      framing_chest_up: false,
-      occupancy_70_percent: false,
-    },
     biometrics: {
       bgLum: 188,
       bgVar: 55,
@@ -694,35 +527,15 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
         eyeRoll: 0.521,
       },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.313, topLabel: 'fail_turned_tilted', failLabel: 'fail_turned_tilted' },
-      eyes_open: { passProb: 0.114, topLabel: 'fail_looking_away', failLabel: 'fail_looking_away' },
-      neutral_expression: { passProb: 0.058, topLabel: 'fail_smiling', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.081, topLabel: 'fail_indoor_clutter', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.294, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.293, topLabel: 'fail_bangs_over_eyes', failLabel: 'fail_bangs_over_eyes' },
-      no_glasses: { passProb: 0.121, topLabel: 'fail_eyeglasses', failLabel: 'fail_eyeglasses' },
-      framing_chest_up: { passProb: 0.14, topLabel: 'fail_off_center', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.15, topLabel: 'fail_too_large', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
   {
     id: 'id_fail_mask_hat.jpg',
     title: 'Mask & Cap',
-    sub: '6 Fails',
-    isCompliant: false,
+    sub: 'Pending…',
+    isCompliant: null,
+    evaluated: false,
     url: photoAssetUrl('id_fail_mask_hat.jpg'),
-    groundTruth: {
-      full_face: false,
-      eyes_open: true,
-      neutral_expression: false,
-      neutral_background: false,
-      shoulders_visible: true,
-      hair_clear: false,
-      no_glasses: true,
-      framing_chest_up: false,
-      occupancy_70_percent: false,
-    },
     biometrics: {
       bgLum: 180,
       bgVar: 10,
@@ -731,17 +544,7 @@ export const PRESET_PHOTOS: PhotoPreset[] = [
       bottomShoulderWidthRatio: 1.0,
       faceInfo: { hasFace: false },
     },
-    rawEg2Vision: {
-      full_face: { passProb: 0.14, topLabel: 'fail_masked', failLabel: 'fail_masked' },
-      eyes_open: { passProb: 0.304, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      neutral_expression: { passProb: 0.576, topLabel: 'pass_neutral', failLabel: 'fail_smiling' },
-      neutral_background: { passProb: 0.427, topLabel: 'pass_white_bg', failLabel: 'fail_indoor_clutter' },
-      shoulders_visible: { passProb: 0.371, topLabel: 'fail_angled_selfie', failLabel: 'fail_angled_selfie' },
-      hair_clear: { passProb: 0.254, topLabel: 'fail_hat_cap', failLabel: 'fail_hat_cap' },
-      no_glasses: { passProb: 0.281, topLabel: 'fail_sunglasses', failLabel: 'fail_sunglasses' },
-      framing_chest_up: { passProb: 0.527, topLabel: 'pass_chest_up', failLabel: 'fail_off_center' },
-      occupancy_70_percent: { passProb: 0.784, topLabel: 'pass_70_pct', failLabel: 'fail_too_large' },
-    },
+    rawEg2Vision: {},
   },
 ];
 
@@ -780,7 +583,7 @@ export class DecisionVisionPlayground {
   }
 
   private computeLogitVector(rawVision: Record<string, RawRuleVisionScore>): number[] {
-    return PASSPORT_RULES.map((r) => logit(rawVision[r.id]?.passProb ?? 0.5));
+    return PASSPORT_RULES.map((r) => logit(rawVision?.[r.id]?.passProb ?? 0.5));
   }
 
   private l2DistSq(a: number[], b: number[]): number {
@@ -796,30 +599,34 @@ export class DecisionVisionPlayground {
   private initExemplarBank() {
     for (const rule of PASSPORT_RULES) {
       this.ruleExemplarBank[rule.id] = { positives: [], negatives: [] };
-      for (const p of PRESET_PHOTOS) {
-        const isPos = Boolean(p.groundTruth?.[rule.id]);
-        const rawProb = p.rawEg2Vision[rule.id].passProb;
-        const entry: ExemplarEntry = {
-          id: p.id,
-          name: p.title,
-          url: p.url,
-          rawPassProb: rawProb,
-          logitVal: logit(rawProb),
-          logitVec: this.computeLogitVector(p.rawEg2Vision),
-          enabled: true,
-        };
-        if (isPos) this.ruleExemplarBank[rule.id].positives.push(entry);
-        else this.ruleExemplarBank[rule.id].negatives.push(entry);
-      }
+    }
+  }
+
+  public setLoadProgress(loaded: number, total: number) {
+    const pct = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+    const loadedMB = (loaded / 1048576).toFixed(0);
+    const totalMB = total > 0 ? (total / 1048576).toFixed(0) : '?';
+    const label = `⏳ Loading 435M-VL: ${pct}% (${loadedMB}/${totalMB} MB)`;
+    if (this.el['dv-result-meta']) {
+      this.el['dv-result-meta'].textContent = label;
+    }
+    if (!this.currentPhotoObj.evaluated && this.el['dv-verdict-sub']) {
+      this.el['dv-verdict-sub'].textContent = label;
     }
   }
 
   public setModelState(state: VisionModelState) {
     const becameReady = !this.modelState.ready && state.ready;
     this.modelState = state;
-    if (becameReady && this.isVisionModelReady()) {
+    if (state.loading && this.el['dv-result-meta'] && !this.el['dv-result-meta'].textContent?.includes('%')) {
+      this.el['dv-result-meta'].textContent = '⏳ Loading 435M-VL: 0%…';
+    } else if (becameReady && this.isVisionModelReady()) {
+      if (this.el['dv-result-meta'] && !this.webcamActive) {
+        this.el['dv-result-meta'].textContent = '✓ 435M-VL Ready · Evaluating…';
+      }
       void this.evaluateCurrentPhotoWithDecisionMaker();
     }
+    this.renderAllPanels();
   }
 
   private isVisionModelReady(): boolean {
@@ -836,7 +643,7 @@ export class DecisionVisionPlayground {
         id: rule.id,
         type: 'categorical',
         prompt: rule.prompt,
-        normalizePrior: true,
+        normalizePrior: Boolean(rule.normalizePrior),
         options: rule.options.map((opt) => ({
           label: opt.label,
           description: opt.description,
@@ -867,7 +674,7 @@ export class DecisionVisionPlayground {
       if (probsArr.length > 0) {
         const passLabel = rule.options[0].label;
         const passEntry = probsArr.find((p) => p.label === passLabel);
-        const passProb = passEntry ? passEntry.probability : (probsArr[0]?.probability ?? 0.5);
+        const pPass = passEntry ? passEntry.probability : 0;
         let bestFailLabel = rule.options[1]?.label ?? passLabel;
         let bestFailProb = -1;
         for (const p of probsArr) {
@@ -876,9 +683,11 @@ export class DecisionVisionPlayground {
             bestFailLabel = p.label;
           }
         }
+        if (bestFailProb < 0) bestFailProb = Math.max(0, 1 - pPass);
+        const binaryPassProb = pPass + bestFailProb > 0 ? pPass / (pPass + bestFailProb) : 0.5;
         out[rule.id] = {
-          passProb,
-          topLabel: dec.label || (passProb >= 0.5 ? passLabel : bestFailLabel),
+          passProb: binaryPassProb,
+          topLabel: dec.label || (binaryPassProb >= 0.5 ? passLabel : bestFailLabel),
           failLabel: bestFailLabel,
         };
       } else if (fallback?.[rule.id]) {
@@ -920,22 +729,31 @@ export class DecisionVisionPlayground {
 
   private async evaluateCurrentPhotoWithDecisionMaker() {
     if (!this.isVisionModelReady() || this.webcamActive) return;
+    const targetPhoto = this.currentPhotoObj;
     const imgEl = this.el['dv-main-img'] as HTMLImageElement | undefined;
-    if (!imgEl || !imgEl.complete || imgEl.naturalWidth === 0) return;
-    const dmEval = await this.evaluateSourceWithDecisionMaker(imgEl, this.currentPhotoObj.rawEg2Vision);
-    if (!dmEval) return;
-    this.currentPhotoObj.rawEg2Vision = dmEval.rawEg2Vision;
-    for (const rule of PASSPORT_RULES) {
-      const bank = this.ruleExemplarBank[rule.id];
-      for (const item of [...bank.positives, ...bank.negatives]) {
-        if (item.id === this.currentPhotoObj.id) {
-          const p = dmEval.rawEg2Vision[rule.id]?.passProb ?? item.rawPassProb;
-          item.rawPassProb = p;
-          item.logitVal = logit(p);
-          item.logitVec = this.computeLogitVector(dmEval.rawEg2Vision);
-        }
-      }
+    let sourceImg: HTMLImageElement | undefined = imgEl;
+    if (!sourceImg || !sourceImg.complete || sourceImg.naturalWidth === 0) {
+      sourceImg = await new Promise<HTMLImageElement | undefined>((resolve) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => resolve(undefined);
+        el.src = targetPhoto.url;
+      });
     }
+    if (!sourceImg) return;
+    const dmEval = await this.evaluateSourceWithDecisionMaker(sourceImg);
+    if (!dmEval) return;
+    targetPhoto.rawEg2Vision = dmEval.rawEg2Vision;
+    targetPhoto.evaluated = true;
+    const evalRes = this.evaluatePhotoRules(targetPhoto);
+    let passCount = 0;
+    for (const r of PASSPORT_RULES) {
+      if (evalRes[r.id].passed) passCount++;
+    }
+    const failCount = PASSPORT_RULES.length - passCount;
+    targetPhoto.isCompliant = failCount === 0;
+    targetPhoto.sub = failCount === 0 ? '9/9 Pass' : `${failCount} Fail${failCount > 1 ? 's' : ''}`;
+    this.renderPresetStrip();
     this.renderAllPanels();
     if (dmEval.inferenceTime !== undefined) {
       if (this.el['dv-result-meta']) {
@@ -971,18 +789,15 @@ export class DecisionVisionPlayground {
     if (this.webcamActive) this.stopWebcamBooth();
     const found = PRESET_PHOTOS.find((x) => x.id === photoId);
     if (!found) return;
+    found.evaluated = false;
+    found.rawEg2Vision = {};
+    found.isCompliant = null;
+    found.sub = this.isVisionModelReady() ? 'Evaluating…' : 'Pending…';
     this.currentPhotoObj = found;
     this.renderPresetStrip();
     this.renderAllPanels();
     if (this.isVisionModelReady()) {
-      const imgEl = this.el['dv-main-img'] as HTMLImageElement | undefined;
-      if (imgEl) {
-        if (imgEl.complete && imgEl.naturalWidth > 0) {
-          void this.evaluateCurrentPhotoWithDecisionMaker();
-        } else {
-          imgEl.addEventListener('load', () => void this.evaluateCurrentPhotoWithDecisionMaker(), { once: true });
-        }
-      }
+      void this.evaluateCurrentPhotoWithDecisionMaker();
     }
   }
 
@@ -1004,6 +819,22 @@ export class DecisionVisionPlayground {
    */
   public evaluatePhotoRules(photoObj: PhotoPreset): Record<string, RuleEvalResult> {
     const results: Record<string, RuleEvalResult> = {};
+    const isEvaluated = Boolean(photoObj?.evaluated && Object.keys(photoObj.rawEg2Vision ?? {}).length > 0);
+    if (!isEvaluated) {
+      for (const rule of PASSPORT_RULES) {
+        results[rule.id] = {
+          pending: true,
+          passed: false,
+          prob: 0,
+          rawPassProb: 0,
+          calPassProb: 0,
+          chosenOptionLabel: rule.options[0].label,
+          reasonText: this.isVisionModelReady() ? 'Evaluating with 435M-VL…' : 'Waiting for 435M-VL model…',
+        };
+      }
+      return results;
+    }
+
     const queryLogitVec = this.computeLogitVector(photoObj.rawEg2Vision);
 
     for (let rIdx = 0; rIdx < PASSPORT_RULES.length; rIdx++) {
@@ -1017,8 +848,8 @@ export class DecisionVisionPlayground {
       const rawL = queryLogitVec[rIdx];
 
       const bank = this.ruleExemplarBank[rule.id];
-      const activePos = bank ? bank.positives.filter((x) => x.enabled) : [];
-      const activeNeg = bank ? bank.negatives.filter((x) => x.enabled) : [];
+      const activePos = bank ? bank.positives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
+      const activeNeg = bank ? bank.negatives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
 
       let calPassProb = rawPassProb;
       if (activePos.length > 0 && activeNeg.length > 0) {
@@ -1056,6 +887,7 @@ export class DecisionVisionPlayground {
       const reasonText = rule.optionDisplay[chosenOptionLabel] || chosenOptionLabel;
 
       results[rule.id] = {
+        pending: false,
         passed,
         prob: finalPassProb,
         rawPassProb,
@@ -1078,10 +910,11 @@ export class DecisionVisionPlayground {
       btn.className = 'dv-preset-btn' + (!this.webcamActive && this.currentPhotoObj.id === p.id ? ' active' : '');
       btn.dataset.presetId = p.id;
       btn.addEventListener('click', () => this.selectPresetPhoto(p.id));
+      const tagClass = p.isCompliant === null ? '' : p.isCompliant ? 'pass' : 'fail';
       btn.innerHTML = `
         <img class="dv-preset-thumb" src="${p.url}" alt="${p.title}" />
         <div class="dv-preset-title">${p.title}</div>
-        <span class="dv-preset-tag ${p.isCompliant ? 'pass' : 'fail'}">${p.sub}</span>
+        <span class="dv-preset-tag ${tagClass}">${p.sub}</span>
       `;
       strip.appendChild(btn);
     }
@@ -1118,6 +951,7 @@ export class DecisionVisionPlayground {
     `;
 
     if (
+      this.currentPhotoObj.evaluated &&
       fi &&
       fi.hasFace &&
       fi.minX !== undefined &&
@@ -1144,22 +978,32 @@ export class DecisionVisionPlayground {
     this.renderActivePhotoView();
 
     const evalRes = this.evaluatePhotoRules(this.currentPhotoObj);
+    const isPending = Boolean(!this.currentPhotoObj.evaluated);
     let passCount = 0;
     for (const r of PASSPORT_RULES) {
       if (evalRes[r.id].passed) passCount++;
     }
-    const allPassed = passCount === PASSPORT_RULES.length;
+    const allPassed = !isPending && passCount === PASSPORT_RULES.length;
 
     const banner = this.el['dv-verdict-banner'];
     const iconEl = this.el['dv-verdict-icon'];
     const titleEl = this.el['dv-verdict-title'];
     const subEl = this.el['dv-verdict-sub'];
     if (banner && iconEl && titleEl && subEl) {
-      banner.className = 'dv-verdict-banner ' + (allPassed ? 'pass' : 'fail');
-      iconEl.textContent = allPassed ? 'check_circle' : 'error';
-      const failCount = PASSPORT_RULES.length - passCount;
-      titleEl.textContent = allPassed ? 'COMPLIANT' : `${failCount} ISSUE${failCount > 1 ? 'S' : ''} DETECTED`;
-      subEl.textContent = `${passCount} / ${PASSPORT_RULES.length} Passed`;
+      if (isPending) {
+        banner.className = 'dv-verdict-banner';
+        iconEl.textContent = 'hourglass_top';
+        titleEl.textContent = this.isVisionModelReady() ? 'EVALUATING PHOTO…' : 'LOADING 435M-VL MODEL…';
+        subEl.textContent = this.isVisionModelReady()
+          ? 'Scoring 9 biometric compliance rules…'
+          : 'Waiting for model initialization…';
+      } else {
+        banner.className = 'dv-verdict-banner ' + (allPassed ? 'pass' : 'fail');
+        iconEl.textContent = allPassed ? 'check_circle' : 'error';
+        const failCount = PASSPORT_RULES.length - passCount;
+        titleEl.textContent = allPassed ? 'COMPLIANT' : `${failCount} ISSUE${failCount > 1 ? 'S' : ''} DETECTED`;
+        subEl.textContent = `${passCount} / ${PASSPORT_RULES.length} Passed`;
+      }
     }
 
     const listEl = this.el['dv-rules-list'];
@@ -1194,15 +1038,24 @@ export class DecisionVisionPlayground {
         const r = evalRes[rule.id];
         const pct = Math.round(r.prob * 100);
         const card = listEl.children[i] as HTMLElement;
-        card.className = `dv-rule-card ${r.passed ? 'pass' : 'fail'}${this.selectedRuleId === rule.id ? ' selected' : ''}`;
         const badgeEl = card.querySelector('.dv-rule-badge') as HTMLElement;
-        badgeEl.className = `dv-rule-badge ${r.passed ? 'pass' : 'fail'}`;
-        badgeEl.textContent = r.passed ? 'PASS' : 'FAIL';
         const reasonEl = card.querySelector('.dv-rule-reason') as HTMLElement;
-        reasonEl.textContent = r.reasonText;
         const fillEl = card.querySelector('.dv-rule-bar-fill') as HTMLElement;
-        fillEl.className = `dv-rule-bar-fill ${r.passed ? 'pass' : 'fail'}`;
-        fillEl.style.width = `${pct}%`;
+        if (r.pending) {
+          card.className = `dv-rule-card${this.selectedRuleId === rule.id ? ' selected' : ''}`;
+          badgeEl.className = 'dv-rule-badge';
+          badgeEl.textContent = 'WAIT';
+          reasonEl.textContent = r.reasonText;
+          fillEl.className = 'dv-rule-bar-fill';
+          fillEl.style.width = '0%';
+        } else {
+          card.className = `dv-rule-card ${r.passed ? 'pass' : 'fail'}${this.selectedRuleId === rule.id ? ' selected' : ''}`;
+          badgeEl.className = `dv-rule-badge ${r.passed ? 'pass' : 'fail'}`;
+          badgeEl.textContent = r.passed ? 'PASS' : 'FAIL';
+          reasonEl.textContent = r.reasonText;
+          fillEl.className = `dv-rule-bar-fill ${r.passed ? 'pass' : 'fail'}`;
+          fillEl.style.width = `${pct}%`;
+        }
       }
     }
 
@@ -1219,8 +1072,13 @@ export class DecisionVisionPlayground {
 
     const statusBadge = this.el['dv-active-rule-badge'];
     if (statusBadge) {
-      statusBadge.className = 'dv-rule-badge ' + (rRes.passed ? 'pass' : 'fail');
-      statusBadge.textContent = `${rRes.passed ? 'PASS' : 'FAIL'} (${Math.round(rRes.prob * 100)}%)`;
+      if (rRes.pending) {
+        statusBadge.className = 'dv-rule-badge';
+        statusBadge.textContent = 'WAIT';
+      } else {
+        statusBadge.className = 'dv-rule-badge ' + (rRes.passed ? 'pass' : 'fail');
+        statusBadge.textContent = `${rRes.passed ? 'PASS' : 'FAIL'} (${Math.round(rRes.prob * 100)}%)`;
+      }
     }
 
     const renderList = (container: HTMLElement | undefined, items: ExemplarEntry[], isPositive: boolean) => {
@@ -1254,6 +1112,7 @@ export class DecisionVisionPlayground {
   }
 
   private addCurrentPhotoAsExemplar(isPositive: boolean) {
+    if (!this.currentPhotoObj.evaluated) return;
     const ruleId = this.selectedRuleId;
     const rawProb = this.currentPhotoObj.rawEg2Vision[ruleId]?.passProb ?? 0.5;
     const entry: ExemplarEntry = {
@@ -1280,18 +1139,17 @@ export class DecisionVisionPlayground {
       r.readAsDataURL(file);
     });
     const ruleId = this.selectedRuleId;
-    const fallbackTemplate = isPositive ? PRESET_PHOTOS[0].rawEg2Vision : PRESET_PHOTOS[2].rawEg2Vision;
-    let rawEg2Vision = { ...fallbackTemplate };
+    let rawEg2Vision: Record<string, RawRuleVisionScore> = {};
 
     const img = await new Promise<HTMLImageElement>((res) => {
       const el = new Image();
       el.onload = () => res(el);
       el.src = dataUrl;
     });
-    const dmEval = await this.evaluateSourceWithDecisionMaker(img, fallbackTemplate);
+    const dmEval = await this.evaluateSourceWithDecisionMaker(img);
     if (dmEval) rawEg2Vision = dmEval.rawEg2Vision;
 
-    const rawProb = rawEg2Vision[ruleId]?.passProb ?? (isPositive ? 0.7 : 0.05);
+    const rawProb = rawEg2Vision[ruleId]?.passProb ?? (isPositive ? 0.8 : 0.2);
     const entry: ExemplarEntry = {
       id: `upload_${Date.now()}`,
       name: file.name.slice(0, 14),
@@ -1312,16 +1170,15 @@ export class DecisionVisionPlayground {
     if (this.el['dv-result-meta']) {
       this.el['dv-result-meta'].textContent = 'Evaluating photo…';
     }
-    const dmEval = await this.evaluateSourceWithDecisionMaker(img, PRESET_PHOTOS[0].rawEg2Vision);
-    const rawEg2Vision: Record<string, RawRuleVisionScore> = dmEval
-      ? dmEval.rawEg2Vision
-      : { ...PRESET_PHOTOS[0].rawEg2Vision };
+    const dmEval = await this.evaluateSourceWithDecisionMaker(img);
+    const rawEg2Vision: Record<string, RawRuleVisionScore> = dmEval ? dmEval.rawEg2Vision : {};
 
     this.currentPhotoObj = {
       id: `custom_${Date.now()}`,
       title: titleLabel,
       sub: 'Custom',
-      isCompliant: false,
+      isCompliant: null,
+      evaluated: Boolean(dmEval),
       url: img.src,
       biometrics: {
         bgLum: 240,
@@ -1336,11 +1193,13 @@ export class DecisionVisionPlayground {
     this.renderPresetStrip();
     this.renderAllPanels();
 
-    const elapsed = dmEval?.inferenceTime ?? performance.now() - t0;
-    if (this.el['dv-result-meta']) {
-      this.el['dv-result-meta'].textContent = `9/9 rules · ${Math.round(elapsed)} ms`;
+    if (dmEval) {
+      const elapsed = dmEval.inferenceTime ?? performance.now() - t0;
+      if (this.el['dv-result-meta']) {
+        this.el['dv-result-meta'].textContent = `9/9 rules · ${Math.round(elapsed)} ms`;
+      }
+      this.onStatus?.('Evaluated photo compliance', elapsed);
     }
-    this.onStatus?.('Evaluated photo compliance', elapsed);
   }
 
   private async handleCustomPhotoUpload(event: Event) {
@@ -1386,6 +1245,7 @@ export class DecisionVisionPlayground {
 
       if (dmEval) {
         this.currentPhotoObj.rawEg2Vision = dmEval.rawEg2Vision;
+        this.currentPhotoObj.evaluated = true;
         this.renderAllPanels();
 
         const elapsed = Math.max(8, Math.round(dmEval.inferenceTime ?? performance.now() - t0));
@@ -1402,8 +1262,12 @@ export class DecisionVisionPlayground {
   public async toggleWebcamBooth() {
     if (this.webcamActive) {
       this.stopWebcamBooth();
+      this.currentPhotoObj = PRESET_PHOTOS[0];
       this.renderPresetStrip();
       this.renderAllPanels();
+      if (this.isVisionModelReady() && !this.currentPhotoObj.evaluated) {
+        void this.evaluateCurrentPhotoWithDecisionMaker();
+      }
       return;
     }
     try {
@@ -1423,12 +1287,12 @@ export class DecisionVisionPlayground {
       if (this.el['dv-snap-btn']) this.el['dv-snap-btn'].style.display = 'inline-flex';
       if (this.el['dv-result-meta']) this.el['dv-result-meta'].textContent = 'Evaluating live frame…';
 
-      const rawEg2Vision: Record<string, RawRuleVisionScore> = { ...this.currentPhotoObj.rawEg2Vision };
       this.currentPhotoObj = {
         id: 'live_webcam',
         title: 'Live Camera',
         sub: 'Live',
-        isCompliant: false,
+        isCompliant: null,
+        evaluated: false,
         url: this.currentPhotoObj.url,
         biometrics: {
           bgLum: 220,
@@ -1438,10 +1302,10 @@ export class DecisionVisionPlayground {
           bottomShoulderWidthRatio: 0.85,
           faceInfo: { hasFace: false },
         },
-        rawEg2Vision,
+        rawEg2Vision: {},
       };
       this.renderPresetStrip();
-      this.renderActivePhotoView();
+      this.renderAllPanels();
       this.runLiveWebcamLoop();
     } catch (err: any) {
       this.onStatus?.(`Webcam error: ${err?.message || err}`);

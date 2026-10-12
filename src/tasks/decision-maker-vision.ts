@@ -132,17 +132,17 @@ export const PASSPORT_RULES: PassportRule[] = [
     shortTitle: 'Head in Frame',
     title: '1. Head Inside Frame',
     normalizePrior: false,
-    prompt: "Is the person's full head visible without being cut off at the top or bottom?",
+    prompt: "Can you see the top of the person's hair and their shirt below the chin?",
     options: [
       {
         label: 'pass_frontal',
         description:
-          'Head and shoulders portrait of a man or woman with hair, chin, and neck visible.',
+          'Portrait showing the top of the head with hair, the chin, and the shirt or shoulders.',
       },
       {
         label: 'fail_cropped',
         description:
-          'Tightly cropped macro close-up of skin, nose, and eyes filling the entire image with no neck or hair.',
+          'Tightly cropped macro close-up of only skin, eyes, nose, and lips filling the entire image.',
       },
     ],
     optionDisplay: {
@@ -157,11 +157,16 @@ export const PASSPORT_RULES: PassportRule[] = [
     shortTitle: 'Eyes Open',
     title: '2. Eyes Open & Direct',
     normalizePrior: false,
-    prompt: "Are the person's eyes open?",
+    prompt: "Are the person's eyes open and looking straight ahead?",
     options: [
       {
         label: 'pass_open',
-        description: 'Person with eyes open looking at the camera.',
+        description:
+          'Front-facing portrait of a person with open eyes looking straight ahead at the camera.',
+      },
+      {
+        label: 'fail_looking_away',
+        description: 'Person with eyes cast downward looking down and away from the camera.',
       },
       {
         label: 'fail_closed',
@@ -174,6 +179,7 @@ export const PASSPORT_RULES: PassportRule[] = [
     ],
     optionDisplay: {
       pass_open: 'Open & looking at camera',
+      fail_looking_away: 'Looking away from camera',
       fail_closed: 'Eyes closed / blinking',
       fail_sunglasses: 'Hidden behind dark lenses',
     },

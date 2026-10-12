@@ -96,6 +96,7 @@ export interface ExemplarEntry {
   logitVal: number;
   logitVec: number[];
   enabled: boolean;
+  isDefault?: boolean;
 }
 
 export interface RuleEvalResult {
@@ -597,8 +598,61 @@ export class DecisionVisionPlayground {
   }
 
   private initExemplarBank() {
+    const defaultFails: Record<string, string[]> = {
+      'passport_compliant_female.jpg': [],
+      'passport_compliant_male.jpg': [],
+      'id_fail_glasses_smile.jpg': ['eyes_open', 'neutral_expression', 'no_glasses'],
+      'id_fail_eyes_closed_hair.jpg': ['eyes_open', 'hair_clear'],
+      'id_fail_extreme_zoom_cropped.jpg': ['full_face', 'occupancy_70_percent'],
+      'id_fail_distant_waist_up.jpg': ['neutral_background', 'occupancy_70_percent'],
+      'id_fail_tilted_glasses_selfie.jpg': [
+        'neutral_expression',
+        'neutral_background',
+        'shoulders_visible',
+        'no_glasses',
+      ],
+      'id_fail_mask_hat.jpg': ['neutral_background', 'framing_chest_up'],
+    };
     for (const rule of PASSPORT_RULES) {
       this.ruleExemplarBank[rule.id] = { positives: [], negatives: [] };
+      for (const p of PRESET_PHOTOS) {
+        const failedRules = defaultFails[p.id] ?? [];
+        const isPos = !failedRules.includes(rule.id);
+        const defaultProb = isPos ? 0.82 : 0.18;
+        const entry: ExemplarEntry = {
+          id: p.id,
+          name: p.title,
+          url: p.url,
+          rawPassProb: defaultProb,
+          logitVal: logit(defaultProb),
+          logitVec: PASSPORT_RULES.map((r) =>
+            logit(!(defaultFails[p.id] ?? []).includes(r.id) ? 0.82 : 0.18)
+          ),
+          enabled: true,
+          isDefault: true,
+        };
+        if (isPos) this.ruleExemplarBank[rule.id].positives.push(entry);
+        else this.ruleExemplarBank[rule.id].negatives.push(entry);
+      }
+    }
+  }
+
+  private syncExemplarBankWithLiveScore(photoObj: PhotoPreset) {
+    if (!photoObj?.rawEg2Vision) return;
+    const vec = this.computeLogitVector(photoObj.rawEg2Vision);
+    for (const rule of PASSPORT_RULES) {
+      const bank = this.ruleExemplarBank[rule.id];
+      if (!bank) continue;
+      const rawProb = photoObj.rawEg2Vision[rule.id]?.passProb ?? 0.5;
+      for (const list of [bank.positives, bank.negatives]) {
+        for (const item of list) {
+          if (item.id === photoObj.id) {
+            item.rawPassProb = rawProb;
+            item.logitVal = logit(rawProb);
+            item.logitVec = vec;
+          }
+        }
+      }
     }
   }
 
@@ -745,6 +799,7 @@ export class DecisionVisionPlayground {
     if (!dmEval) return;
     targetPhoto.rawEg2Vision = dmEval.rawEg2Vision;
     targetPhoto.evaluated = true;
+    this.syncExemplarBankWithLiveScore(targetPhoto);
     const evalRes = this.evaluatePhotoRules(targetPhoto);
     let passCount = 0;
     for (const r of PASSPORT_RULES) {
@@ -848,8 +903,19 @@ export class DecisionVisionPlayground {
       const rawL = queryLogitVec[rIdx];
 
       const bank = this.ruleExemplarBank[rule.id];
-      const activePos = bank ? bank.positives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
-      const activeNeg = bank ? bank.negatives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
+      const hasExemplarCustomization = Boolean(
+        bank &&
+          (bank.positives.some((x) => !x.isDefault || !x.enabled) ||
+            bank.negatives.some((x) => !x.isDefault || !x.enabled))
+      );
+      const activePos =
+        hasExemplarCustomization && bank
+          ? bank.positives.filter((x) => x.enabled && x.id !== photoObj.id)
+          : [];
+      const activeNeg =
+        hasExemplarCustomization && bank
+          ? bank.negatives.filter((x) => x.enabled && x.id !== photoObj.id)
+          : [];
 
       let calPassProb = rawPassProb;
       if (activePos.length > 0 && activeNeg.length > 0) {

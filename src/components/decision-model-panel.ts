@@ -16,39 +16,24 @@
 
 /**
  * Model controls shared by the Decision Maker and Dino Game pages: model
- * selector, Load Model button, load status, streaming progress bar and the
- * delegate select. All state lives in decisionRuntime, so the controls show
- * the same model on both pages.
+ * selector, Load Model button, load status and streaming progress bar. GPU
+ * only (no delegate select), like the Semantic Retriever. All state lives in
+ * decisionRuntime, so the controls show the same model on both pages.
  */
 
 import { ModelSelector, type ModelSelection } from './model-selector';
-import { DECISION_MODELS, decisionModelDownloadUrl, decisionRuntime, type Delegate } from './decision-runtime';
+import { DECISION_MODELS, decisionModelDownloadUrl, decisionRuntime } from './decision-runtime';
 
 const MODEL_PANEL_HTML = `
   <div class="section-title">Model Selection</div>
   <div id="model-selector-container"></div>`;
 
-const DELEGATE_HTML = `
-  <div class="control-group">
-    <div class="control-label">
-      <span>Delegate</span>
-    </div>
-    <div class="select-wrapper">
-      <select id="delegate-select">
-        <option value="GPU">GPU</option>
-        <option value="CPU">CPU</option>
-      </select>
-    </div>
-  </div>`;
-
 /**
- * Renders the model controls into `modelContainer` and the delegate select into
- * `delegateContainer`, wired to decisionRuntime. Returns a cleanup function.
+ * Renders the model controls into `modelContainer`, wired to decisionRuntime.
+ * Returns a cleanup function.
  */
-export function mountDecisionModelPanel(modelContainer: HTMLElement, delegateContainer: HTMLElement): () => void {
+export function mountDecisionModelPanel(modelContainer: HTMLElement): () => void {
   modelContainer.innerHTML = MODEL_PANEL_HTML;
-  delegateContainer.innerHTML = DELEGATE_HTML;
-  const delegateSelect = delegateContainer.querySelector<HTMLSelectElement>('#delegate-select')!;
 
   // Enhanced ModelSelector now natively handles the "Load Model" (Initialize Task) button,
   // file upload accept tags, caching indicators, and progress streaming.
@@ -79,11 +64,8 @@ export function mountDecisionModelPanel(modelContainer: HTMLElement, delegateCon
     }
   );
 
-  delegateSelect.addEventListener('change', () => decisionRuntime.setDelegate(delegateSelect.value as Delegate));
-
   const renderState = () => {
     const rt = decisionRuntime;
-    delegateSelect.value = rt.delegate;
     selector.setBusy(rt.loading);
     if (rt.loading) {
       selector.setStatus(`Loading ${rt.loadingLabel}...`);

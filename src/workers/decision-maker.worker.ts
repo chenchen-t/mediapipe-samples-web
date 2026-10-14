@@ -55,8 +55,9 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
         delegate: this.currentOptions.delegate === 'GPU' ? 'GPU' : 'CPU',
       },
       ...(size ? { modelAssetSize: size } : {}),
-      // Same as the Android sample; the default (256) is too small for longer inputs.
-      maxNumTokens: 4096,
+      // With @mediapipe/tasks-decision 1.1.1, larger budgets (e.g. 4096) make LiteRT-LM
+      // EmbeddingEngine creation fail on WebGPU for the EmbeddingGemma-2 models.
+      maxNumTokens: 256,
     });
 
     // In @mediapipe/tasks-decision@1.1.0, synchronous embind execution (when using

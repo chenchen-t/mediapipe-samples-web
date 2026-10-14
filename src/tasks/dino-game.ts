@@ -436,7 +436,7 @@ class DinoGameTask {
   private running = false;
   private busy = false;
   /** Shared "Inference Time" badge + history graph, same as the other tasks. */
-  private inferenceTimer = new InferenceTimer();
+  private inferenceTimer = new InferenceTimer({ mode: 'single', labelA: 'Decision' });
   /** Bumped on reset/model change so stale async answers are ignored. */
   private epoch = 0;
   private inFlight = false;
@@ -479,7 +479,7 @@ class DinoGameTask {
     window.addEventListener('keydown', this.onKeyDown);
 
     // Model controls and state are shared with the Decision Maker page.
-    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel'], this.el['dm-delegate-panel']));
+    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel']));
     this.disposers.push(
       decisionRuntime.subscribe((event) => {
         if (event.type === 'loading') {
@@ -546,7 +546,7 @@ class DinoGameTask {
       selectedKey: string;
       probabilities: Record<string, number>;
     };
-    this.inferenceTimer.record(msg.inferenceTime, decisionRuntime.delegate);
+    this.inferenceTimer.recordSingle(msg.inferenceTime);
     const action = (selectedKey?.toUpperCase() as Action) ?? 'WAIT';
     const probs = Object.fromEntries(ACTIONS.map((a) => [a, probabilities?.[a.toLowerCase()] ?? 0])) as Record<
       Action,

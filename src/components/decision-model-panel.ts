@@ -28,23 +28,44 @@ const MODEL_PANEL_HTML = `
   <div class="section-title">Model Selection</div>
   <div id="model-selector-container"></div>`;
 
+export type DecisionModelPanelHandle = (() => void) & {
+  setModality: (modality: 'text' | 'vision') => void;
+};
+
 /**
  * Renders the model controls into `modelContainer`, wired to decisionRuntime.
  * Returns a cleanup function.
  */
-export function mountDecisionModelPanel(modelContainer: HTMLElement): () => void {
+export function mountDecisionModelPanel(
+  modelContainer: HTMLElement,
+  initialModality: 'text' | 'vision' = 'text'
+): DecisionModelPanelHandle {
   modelContainer.innerHTML = MODEL_PANEL_HTML;
+
+  const getOptionsForModality = (modality: 'text' | 'vision') => {
+    const entries = Object.entries(DECISION_MODELS).filter(
+      ([, m]) => !m.unsupported && (modality !== 'vision' || Boolean(m.supportsVision))
+    );
+    if (
+      modality === 'vision' &&
+      !entries.some(([value]) => value === decisionRuntime.modelName) &&
+      entries.length > 0
+    ) {
+      decisionRuntime.modelName = entries[0][0];
+    }
+    return entries.map(([value, m]) => ({
+      value,
+      label: m.label,
+      isDefault: value === decisionRuntime.modelName,
+      disabled: m.unsupported,
+    }));
+  };
 
   // Enhanced ModelSelector now natively handles the "Load Model" (Initialize Task) button,
   // file upload accept tags, caching indicators, and progress streaming.
   const selector = new ModelSelector(
     'model-selector-container',
-    Object.entries(DECISION_MODELS).map(([value, m]) => ({
-      value,
-      label: m.label,
-      isDefault: value === decisionRuntime.modelName,
-      disabled: m.unsupported,
-    })),
+    getOptionsForModality(initialModality),
     (selection: ModelSelection) => {
       // With autoLoad: false, this is called when the user explicitly clicks the load button
       // or selects a file. We just update the state and call load().
@@ -64,8 +85,16 @@ export function mountDecisionModelPanel(modelContainer: HTMLElement): () => void
     }
   );
 
+  const stdSelect = modelContainer.querySelector<HTMLSelectElement>('#model-selector-container-standard-select');
+  stdSelect?.addEventListener('change', () => {
+    decisionRuntime.modelName = stdSelect.value;
+  });
+
   const renderState = () => {
     const rt = decisionRuntime;
+    if (stdSelect && !rt.loading && !rt.loadedLabel && stdSelect.value !== rt.modelName) {
+      stdSelect.value = rt.modelName;
+    }
     selector.setBusy(rt.loading);
     if (rt.loading) {
       selector.setStatus(`Loading ${rt.loadingLabel}...`);
@@ -88,5 +117,11 @@ export function mountDecisionModelPanel(modelContainer: HTMLElement): () => void
     } else if (event.type === 'state') renderState();
   });
   renderState();
-  return unsubscribe;
+
+  const handle = (() => unsubscribe()) as DecisionModelPanelHandle;
+  handle.setModality = (modality: 'text' | 'vision') => {
+    selector.updateOptions(getOptionsForModality(modality));
+    renderState();
+  };
+  return handle;
 }

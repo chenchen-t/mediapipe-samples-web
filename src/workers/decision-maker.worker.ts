@@ -17,6 +17,30 @@
 import { DecisionMaker, FilesetResolver } from '@mediapipe/tasks-decision';
 import { BaseWorker } from './base-worker';
 
+function shouldSuppressCppLog(args: unknown[]): boolean {
+  const first = typeof args[0] === 'string' ? args[0].trimStart() : '';
+  return (
+    first.startsWith('INFO:') ||
+    first.startsWith('VERBOSE:') ||
+    first.startsWith('WARNING:') ||
+    first.startsWith('I0000 ') ||
+    first.startsWith('W0000 ')
+  );
+}
+
+const origConsoleError = console.error.bind(console);
+const origConsoleWarn = console.warn.bind(console);
+const origConsoleLog = console.log.bind(console);
+console.error = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleError(...args);
+};
+console.warn = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleWarn(...args);
+};
+console.log = (...args: unknown[]) => {
+  if (!shouldSuppressCppLog(args)) origConsoleLog(...args);
+};
+
 const DEFAULT_TRUE_DESC = 'yes, the statement holds';
 const DEFAULT_FALSE_DESC = 'no, the statement does not hold';
 
@@ -39,7 +63,9 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
 
   protected async initializeTask(): Promise<void> {
     const fileset = await FilesetResolver.forDecisionTasks(this.getWasmPath(), true);
-    fileset.wasmLoaderPath = `${fileset.wasmLoaderPath}?cb=${Date.now()}`; // Force reload
+    const cb = Date.now();
+    fileset.wasmLoaderPath = `${fileset.wasmLoaderPath}?cb=${cb}`;
+    fileset.wasmBinaryPath = `${fileset.wasmBinaryPath}?cb=${cb}`;
 
     const file: File | undefined = this.currentOptions.modelFile;
     const url: string = this.currentOptions.modelAssetPath ?? '';
@@ -60,16 +86,34 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       maxNumTokens: 256,
     });
 
-    // In @mediapipe/tasks-decision@1.1.0, synchronous embind execution (when using
-    // the CPU delegate) returns a direct value instead of a Promise, while
-    // decision_bundle.mjs calls `.then()` on the return value. Wrap the underlying
-    // Wasm methods with Promise.resolve() so both GPU and CPU delegates work seamlessly.
-    const wasmMod = (this.taskInstance as any)?.i?.h;
+    // Serialize all asyncify Wasm calls through a per-module promise queue so
+    // concurrent evaluate/prewarm calls never re-enter a suspended Wasm stack
+    // while holding absl::Mutex.
+    const wasmMod =
+      (this.taskInstance as any)?.j?.h ?? (this.taskInstance as any)?.o?.h ?? (this.taskInstance as any)?.i?.h;
     if (wasmMod) {
-      for (const fn of ['evaluateBoolean', 'evaluateChoice', 'evaluateScore', 'evaluateSchema', 'prewarmSchema']) {
+      if (!wasmMod._callQueue) wasmMod._callQueue = Promise.resolve();
+      for (const fn of [
+        'evaluateBoolean',
+        'evaluateChoice',
+        'evaluateScore',
+        'evaluateSchema',
+        'prewarmSchema',
+        'evaluateContextBoolean',
+        'evaluateContextChoice',
+        'evaluateContextScore',
+        'evaluateContextSchema',
+      ]) {
         if (typeof wasmMod[fn] === 'function' && !wasmMod[fn]._promised) {
           const orig = wasmMod[fn].bind(wasmMod);
-          wasmMod[fn] = (...args: any[]) => Promise.resolve(orig(...args));
+          wasmMod[fn] = (...args: any[]) => {
+            const next = wasmMod._callQueue.then(() => Promise.resolve(orig(...args)));
+            wasmMod._callQueue = next.then(
+              () => {},
+              () => {}
+            );
+            return next;
+          };
           wasmMod[fn]._promised = true;
         }
       }
@@ -92,12 +136,14 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       threshold?: number;
       context?: string;
       options?: Array<{ label: string; description: string }>;
-    }
+    },
+    imageBytes?: Uint8Array
   ): Promise<{ value: boolean; probabilityTrue: number; lowSignal?: boolean }> {
     const dm = this.taskInstance!;
     const threshold = typeof question.threshold === 'number' ? question.threshold : 0.5;
+    const hasImage = Boolean(imageBytes && imageBytes.byteLength > 0);
 
-    if (isTooShort(text)) {
+    if (!hasImage && isTooShort(text)) {
       const errOnTrue = threshold < 0.5;
       return {
         value: errOnTrue,
@@ -113,7 +159,7 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       (customTrue !== '' && customTrue !== DEFAULT_TRUE_DESC) ||
       (customFalse !== '' && customFalse !== DEFAULT_FALSE_DESC);
 
-    if (this.isEmbeddingGemma || hasCustomOptions) {
+    if (this.isEmbeddingGemma || hasCustomOptions || hasImage) {
       const cond = question.condition.trim();
       const trueDesc =
         customTrue && customTrue !== DEFAULT_TRUE_DESC
@@ -124,14 +170,18 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
           ? customFalse
           : `No, the input text does NOT satisfy this condition, is opposite, or lacks concrete evidence: ${cond}`;
 
-      const choiceRes = await dm.evaluateChoice(text, {
-        instructions: this.isEmbeddingGemma ? '' : cond,
-        criteria: {
-          false: falseDesc,
-          true: trueDesc,
+      const choiceRes = await this.evaluateChoiceSmart(
+        text,
+        {
+          instructions: this.isEmbeddingGemma ? '' : cond,
+          criteria: {
+            false: falseDesc,
+            true: trueDesc,
+          },
+          ...(!this.isEmbeddingGemma && question.context ? { context: question.context } : {}),
         },
-        ...(!this.isEmbeddingGemma && question.context ? { context: question.context } : {}),
-      });
+        imageBytes
+      );
       const rawProbs = choiceRes.probabilities ?? {};
       const pTrue = rawProbs['true'] ?? 0;
       return {
@@ -151,7 +201,8 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       options?: Array<{ label: string; description?: string }>;
       instructions?: string;
       context?: string;
-    }
+    },
+    imageBytes?: Uint8Array
   ): Promise<{ selectedKey: string; probabilities: Record<string, number>; lowSignal?: boolean }> {
     const dm = this.taskInstance!;
     // Normalize `options: [{label, description}]` into `criteria: {label: description}`.
@@ -164,20 +215,23 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       return { selectedKey: '', probabilities: {} };
     }
 
-    if (isTooShort(text)) {
+    const hasImage = Boolean(imageBytes && imageBytes.byteLength > 0);
+    if (!hasImage && isTooShort(text)) {
       const fallbackKey = keys[keys.length - 1];
       const probs: Record<string, number> = {};
       for (const k of keys) probs[k] = k === fallbackKey ? 1 : 0;
       return { selectedKey: fallbackKey, probabilities: probs, lowSignal: true };
     }
 
+    const input = hasImage ? { text: text ?? '', imageBytes } : text;
+
     if (this.isEmbeddingGemma) {
-      return dm.evaluateChoice(text, {
+      return dm.evaluateChoice(input, {
         instructions: '',
         criteria,
       });
     }
-    return dm.evaluateChoice(text, {
+    return dm.evaluateChoice(input, {
       instructions: question.instructions,
       context: question.context,
       criteria,
@@ -190,7 +244,8 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       rubric: string[];
       instructions?: string;
       context?: string;
-    }
+    },
+    imageBytes?: Uint8Array
   ): Promise<{ selectedIndex: number; expectedScore: number; probabilities: number[]; lowSignal?: boolean }> {
     const dm = this.taskInstance!;
     const n = question.rubric?.length ?? 0;
@@ -198,7 +253,8 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       return { selectedIndex: 0, expectedScore: 0, probabilities: [] };
     }
 
-    if (isTooShort(text)) {
+    const hasImage = Boolean(imageBytes && imageBytes.byteLength > 0);
+    if (!hasImage && isTooShort(text)) {
       const probs = question.rubric.map((_, i) => (i === 0 ? 1 : 0));
       return {
         selectedIndex: 0,
@@ -210,16 +266,20 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
 
     const cleanRubric = question.rubric.map((entry) => entry.replace(/^\d+\s*:\s*/, ''));
 
-    if (this.isEmbeddingGemma) {
+    if (this.isEmbeddingGemma || hasImage) {
       const criteria: Record<string, string> = {};
       cleanRubric.forEach((entry, i) => {
         const sep = entry.indexOf(': ');
         criteria[`__lvl_${i}__`] = sep > 0 ? entry.slice(sep + 2) : entry;
       });
-      const choiceRes = await dm.evaluateChoice(text, {
-        instructions: '',
-        criteria,
-      });
+      const choiceRes = await this.evaluateChoiceSmart(
+        text,
+        {
+          instructions: '',
+          criteria,
+        },
+        imageBytes
+      );
       const rawProbs = choiceRes.probabilities ?? {};
       const probs = cleanRubric.map((_, i) => rawProbs[`__lvl_${i}__`] ?? 0);
       let best = 0;
@@ -256,20 +316,45 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       return;
     }
 
+    const imageBytes: Uint8Array | undefined =
+      data.imageBytes instanceof Uint8Array
+        ? data.imageBytes
+        : data.imageBytes
+          ? new Uint8Array(data.imageBytes)
+          : undefined;
+
     const startTimeMs = performance.now();
     const result =
       data.kind === 'schema' || data.kind === 'polymorphic'
-        ? await this.evaluateSchema(data.text, data.question)
+        ? await this.evaluateSchema(data.text ?? '', data.question, imageBytes)
         : data.kind === 'choice'
-          ? await this.evaluateChoiceSmart(data.text, data.question)
+          ? await this.evaluateChoiceSmart(data.text ?? '', data.question, imageBytes)
           : data.kind === 'score'
-            ? await this.evaluateScoreSmart(data.text, data.question)
-            : await this.evaluateBooleanSmart(data.text, data.question);
+            ? await this.evaluateScoreSmart(data.text ?? '', data.question, imageBytes)
+            : await this.evaluateBooleanSmart(data.text ?? '', data.question, imageBytes);
     const inferenceTime = performance.now() - startTimeMs;
     self.postMessage({ type: 'DECIDE_RESULT', id: data.id, result, inferenceTime });
   }
 
-  private async evaluateSchema(text: string, schema: any): Promise<Record<string, any>> {
+  private async evaluateSchema(text: string, schema: any, imageBytes?: Uint8Array): Promise<Record<string, any>> {
+    const hasImage = Boolean(imageBytes && imageBytes.byteLength > 0);
+    if (hasImage) {
+      const dm = this.taskInstance!;
+      const questions = (schema.questions ?? []).map((q: any) => ({
+        ...q,
+        prompt: q.prompt ?? '',
+        normalizePrior: q.normalizePrior ?? true,
+      }));
+      return dm.evaluate(
+        { text: text ?? '', imageBytes },
+        {
+          ...schema,
+          context: schema.context ?? '',
+          questions,
+        }
+      );
+    }
+
     const context: string | undefined = schema.context || undefined;
     const result: Record<string, any> = {};
     for (const q of schema.questions ?? []) {
@@ -277,12 +362,16 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
       const options: { label: string; description?: string }[] = q.options ?? [];
       if (type === 'binary' || type === 'boolean') {
         const threshold = typeof q.threshold === 'number' ? q.threshold : 0.5;
-        const r = await this.evaluateBooleanSmart(text, {
-          condition: q.prompt,
-          context,
-          threshold,
-          options: options.map((o) => ({ label: o.label, description: o.description ?? '' })),
-        });
+        const r = await this.evaluateBooleanSmart(
+          text,
+          {
+            condition: q.prompt,
+            context,
+            threshold,
+            options: options.map((o) => ({ label: o.label, description: o.description ?? '' })),
+          },
+          imageBytes
+        );
         const p = r.probabilityTrue;
         result[q.id] = {
           id: q.id,
@@ -297,7 +386,7 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
         };
       } else if (type === 'categorical' || type === 'choice') {
         const criteria = Object.fromEntries(options.map((o) => [o.label, o.description ?? '']));
-        const r = await this.evaluateChoiceSmart(text, { criteria, instructions: q.prompt, context });
+        const r = await this.evaluateChoiceSmart(text, { criteria, instructions: q.prompt, context }, imageBytes);
         const probs: Record<string, number> = r.probabilities ?? {};
         result[q.id] = {
           id: q.id,
@@ -308,7 +397,7 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
         };
       } else {
         const rubric = options.map((o) => (o.description ? `${o.label}: ${o.description}` : o.label));
-        const r = await this.evaluateScoreSmart(text, { rubric, instructions: q.prompt, context });
+        const r = await this.evaluateScoreSmart(text, { rubric, instructions: q.prompt, context }, imageBytes);
         const probs: number[] = r.probabilities ?? [];
         const best = r.selectedIndex ?? probs.indexOf(Math.max(...probs));
         result[q.id] = {

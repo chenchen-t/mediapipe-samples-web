@@ -32,7 +32,10 @@ import { EMBEDDING_GEMMA_2_TEXT_270M, EMBEDDING_GEMMA_2_TEXT_VISION_440M } from 
  * model cache, so one already fetched by another demo is reused); the others are
  * served by the dev server from LOCAL_MODELS_DIR (see vite.config.ts).
  */
-export const DECISION_MODELS: Record<string, { label: string; file: string; url?: string; unsupported?: boolean }> = {
+export const DECISION_MODELS: Record<
+  string,
+  { label: string; file: string; url?: string; unsupported?: boolean; supportsVision?: boolean }
+> = {
   embeddinggemma2_270m: {
     label: EMBEDDING_GEMMA_2_TEXT_270M.name,
     file: EMBEDDING_GEMMA_2_TEXT_270M.fileName,
@@ -44,6 +47,7 @@ export const DECISION_MODELS: Record<string, { label: string; file: string; url?
     label: EMBEDDING_GEMMA_2_TEXT_VISION_440M.name,
     file: EMBEDDING_GEMMA_2_TEXT_VISION_440M.fileName,
     url: EMBEDDING_GEMMA_2_TEXT_VISION_440M.url,
+    supportsVision: true,
   },
   laya_s256: {
     label: 'Laya S256',
@@ -179,12 +183,14 @@ class DecisionRuntimeManager {
   }
 
   /** Runs one evaluation in the worker; resolves with the raw worker message. */
-  ask(text: string, kind: DecisionKind, question: object): Promise<any> {
+  ask(input: string | { text?: string; imageBytes?: Uint8Array }, kind: DecisionKind, question: object): Promise<any> {
     if (!this.worker || !this.ready) return Promise.resolve({ type: 'ERROR', error: 'Model not ready' });
     const id = ++this.requestId;
+    const text = typeof input === 'string' ? input : (input.text ?? '');
+    const imageBytes = typeof input === 'object' && input !== null ? input.imageBytes : undefined;
     return new Promise((resolve) => {
       this.resolvers.set(id, resolve);
-      this.worker!.postMessage({ type: 'DECIDE', id, kind, text, question });
+      this.worker!.postMessage({ type: 'DECIDE', id, kind, text, imageBytes, question });
     });
   }
 

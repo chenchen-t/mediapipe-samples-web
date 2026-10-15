@@ -26,20 +26,29 @@
 
 import template from '../templates/decision-maker.html?raw';
 import { InferenceTimer } from '../components/inference-timer';
-import { decisionRuntime } from '../components/decision-runtime';
-import { mountDecisionModelPanel } from '../components/decision-model-panel';
+import { DECISION_MODELS, decisionRuntime } from '../components/decision-runtime';
+import { mountDecisionModelPanel, type DecisionModelPanelHandle } from '../components/decision-model-panel';
 import { DecisionTextPlayground } from './decision-maker-text';
+import { DecisionVisionPlayground } from './decision-maker-vision';
 
 class DecisionMakerTask {
   /** Shared "Inference Time" badge + history graph, same as the other tasks. */
   private inferenceTimer = new InferenceTimer({ mode: 'single', labelA: 'Evaluation' });
   private textPlayground!: DecisionTextPlayground;
+  private visionPlayground!: DecisionVisionPlayground;
+  private modelPanel?: DecisionModelPanelHandle;
+  private mode: 'text' | 'vision' = 'text';
   private disposers: (() => void)[] = [];
   private el: Record<string, HTMLElement> = {};
   /** Last runtime load error, surfaced in the Decision box while no model is ready. */
   private lastLoadError: string | undefined;
 
-  constructor(private container: HTMLElement) {}
+  constructor(
+    private container: HTMLElement,
+    initialMode: 'text' | 'vision' = 'text'
+  ) {
+    this.mode = initialMode;
+  }
 
   init() {
     this.container.innerHTML = template;
@@ -56,13 +65,34 @@ class DecisionMakerTask {
     );
     this.textPlayground.init();
 
+    this.visionPlayground = new DecisionVisionPlayground(
+      this.el['dm-vision-view'],
+      (input, kind, question) => decisionRuntime.ask(input, kind, question),
+      (text, inferenceTime) => {
+        if (inferenceTime === undefined) return this.setStatus(text);
+        this.inferenceTimer.recordSingle(inferenceTime);
+        this.setStatus(`${text} in ${Math.round(inferenceTime)}ms`);
+      },
+      () => this.ensureVisionModelLoaded()
+    );
+    this.visionPlayground.init();
+
     // Model controls and state are shared with the Dino Game page.
-    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel']));
+    this.modelPanel = mountDecisionModelPanel(this.el['dm-model-panel'], this.mode);
+    this.disposers.push(this.modelPanel);
+    this.setMode(this.mode);
     this.disposers.push(
       decisionRuntime.subscribe((event) => {
         if (event.type === 'loading') {
           this.inferenceTimer.resetRollingWindow();
           this.lastLoadError = undefined;
+        } else if (event.type === 'progress') {
+          const pct = event.total > 0 ? Math.min(100, Math.round((event.loaded / event.total) * 100)) : 0;
+          const loadedMB = (event.loaded / 1048576).toFixed(0);
+          const totalMB = event.total > 0 ? (event.total / 1048576).toFixed(0) : '?';
+          this.setStatus(`Loading ${decisionRuntime.loadingLabel}... ${pct}% (${loadedMB}/${totalMB} MB)`);
+          this.visionPlayground.setLoadProgress(event.loaded, event.total);
+          return;
         } else if (event.type === 'status') {
           this.setStatus(event.text);
         } else if (event.type === 'error') {
@@ -80,17 +110,71 @@ class DecisionMakerTask {
     else this.setStatus('Load a model to begin');
   }
 
+  private setMode(mode: 'text' | 'vision') {
+    this.mode = mode;
+    if (this.el['dm-header-title']) {
+      this.el['dm-header-title'].textContent = mode === 'vision' ? 'Decision Maker - ID Photo' : 'Decision Maker';
+    }
+    this.modelPanel?.setModality(mode);
+    if (mode !== 'vision') {
+      this.visionPlayground.stopWebcamBooth();
+    } else if (
+      !decisionRuntime.customModel &&
+      ((!decisionRuntime.ready && !decisionRuntime.loading) ||
+        (decisionRuntime.loadedValue && !DECISION_MODELS[decisionRuntime.loadedValue]?.supportsVision))
+    ) {
+      decisionRuntime.select('embeddinggemma2_text_vision_440m');
+      void decisionRuntime.load();
+    }
+    this.el['dm-text-view'].style.display = mode === 'text' ? '' : 'none';
+    this.el['dm-vision-view'].style.display = mode === 'vision' ? '' : 'none';
+  }
+
   /** Mirrors the shared runtime into the playground's Decision box. */
   private syncModelState() {
-    this.textPlayground.setModelState({
+    const state = {
       ready: decisionRuntime.ready,
       loading: decisionRuntime.loading,
       label: decisionRuntime.loading ? decisionRuntime.loadingLabel : (decisionRuntime.loadedLabel ?? ''),
+      loadedValue: decisionRuntime.loadedValue,
+      hasCustomModel: Boolean(decisionRuntime.customModel),
       error: decisionRuntime.failed ? this.lastLoadError : undefined,
+    };
+    this.textPlayground.setModelState(state);
+    this.visionPlayground.setModelState(state);
+  }
+
+  private ensureVisionModelLoaded(): Promise<boolean> {
+    if (
+      decisionRuntime.ready &&
+      (decisionRuntime.loadedValue === 'embeddinggemma2_text_vision_440m' || Boolean(decisionRuntime.customModel))
+    ) {
+      return Promise.resolve(true);
+    }
+    const isLoadingVision =
+      decisionRuntime.loading &&
+      (decisionRuntime.loadingValue === 'embeddinggemma2_text_vision_440m' || Boolean(decisionRuntime.customModel));
+    if (!isLoadingVision) {
+      if (!decisionRuntime.customModel) {
+        decisionRuntime.select('embeddinggemma2_text_vision_440m');
+      }
+      void decisionRuntime.load();
+    }
+    return new Promise((resolve) => {
+      const unsubscribe = decisionRuntime.subscribe((event) => {
+        if (event.type === 'ready') {
+          unsubscribe();
+          resolve(true);
+        } else if (event.type === 'error') {
+          unsubscribe();
+          resolve(false);
+        }
+      });
     });
   }
 
   cleanup() {
+    this.visionPlayground?.cleanup();
     this.inferenceTimer.cleanup();
     // The worker and model stay loaded in decisionRuntime for the next page.
     for (const dispose of this.disposers) dispose();
@@ -106,7 +190,12 @@ class DecisionMakerTask {
 let activeTask: DecisionMakerTask | null = null;
 
 export async function setupDecisionMaker(container: HTMLElement) {
-  activeTask = new DecisionMakerTask(container);
+  activeTask = new DecisionMakerTask(container, 'text');
+  activeTask.init();
+}
+
+export async function setupDecisionVision(container: HTMLElement) {
+  activeTask = new DecisionMakerTask(container, 'vision');
   activeTask.init();
 }
 
@@ -116,3 +205,5 @@ export function cleanupDecisionMaker() {
     activeTask = null;
   }
 }
+
+export const cleanupDecisionVision = cleanupDecisionMaker;

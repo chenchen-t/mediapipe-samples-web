@@ -34,7 +34,7 @@ import { DecisionVisionPlayground } from './decision-maker-vision';
 
 class DecisionMakerTask {
   /** Shared "Inference Time" badge + history graph, same as the other tasks. */
-  private inferenceTimer = new InferenceTimer();
+  private inferenceTimer = new InferenceTimer({ mode: 'single', labelA: 'Evaluation' });
   private textPlayground!: DecisionTextPlayground;
   private visionPlayground!: DecisionVisionPlayground;
   private modelPanel?: DecisionModelPanelHandle;
@@ -60,7 +60,7 @@ class DecisionMakerTask {
       (kind, text, question) => decisionRuntime.ask(text, kind, question),
       (text, inferenceTime) => {
         if (inferenceTime === undefined) return this.setStatus(text);
-        this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
+        this.inferenceTimer.recordSingle(inferenceTime);
         this.setStatus(`Done in ${Math.round(inferenceTime)}ms`);
       }
     );
@@ -71,7 +71,7 @@ class DecisionMakerTask {
       (input, kind, question) => decisionRuntime.ask(input, kind, question),
       (text, inferenceTime) => {
         if (inferenceTime === undefined) return this.setStatus(text);
-        this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
+        this.inferenceTimer.recordSingle(inferenceTime);
         this.setStatus(`${text} in ${Math.round(inferenceTime)}ms`);
       },
       () => this.ensureVisionModelLoaded()
@@ -95,7 +95,7 @@ class DecisionMakerTask {
       }
     );
     // Model controls and state are shared with the Dino Game page.
-    this.modelPanel = mountDecisionModelPanel(this.el['dm-model-panel'], this.el['dm-delegate-panel'], this.mode);
+    this.modelPanel = mountDecisionModelPanel(this.el['dm-model-panel'], this.mode);
     this.disposers.push(this.modelPanel);
     this.setMode(this.mode);
     this.disposers.push(

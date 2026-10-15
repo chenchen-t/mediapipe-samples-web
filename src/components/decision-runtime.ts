@@ -66,7 +66,6 @@ export function decisionModelDownloadUrl(name: string): string | undefined {
 
 /** `schema` evaluates a whole ClassifierSchema in one request. */
 export type DecisionKind = QuestionKind | 'schema';
-export type Delegate = 'GPU' | 'CPU';
 
 export type RuntimeEvent =
   /** Load started (pages should stop using the old model). */
@@ -79,7 +78,7 @@ export type RuntimeEvent =
   | { type: 'error'; error: string }
   /** A line for the page's status message. */
   | { type: 'status'; text: string }
-  /** loading / ready / selection / delegate changed: re-read the runtime state. */
+  /** loading / ready / selection changed: re-read the runtime state. */
   | { type: 'state' }
   | { type: 'cached' };
 
@@ -87,7 +86,6 @@ class DecisionRuntimeManager {
   modelName = 'embeddinggemma2_270m';
   /** Set when the user uploads a model file instead of picking a standard one. */
   customModel: File | undefined;
-  delegate: Delegate = 'GPU';
 
   ready = false;
   /** True from load() until the worker reports INIT_DONE / ERROR. */
@@ -137,13 +135,6 @@ class DecisionRuntimeManager {
     this.load();
   }
 
-  /** Only reloads if a model is already loaded (or loading); otherwise waits for Load Model. */
-  setDelegate(delegate: Delegate) {
-    this.delegate = delegate;
-    if (this.loadedLabel || this.loading) this.load();
-    else this.emit({ type: 'state' });
-  }
-
   async load() {
     this.worker?.terminate();
     this.worker = undefined;
@@ -185,7 +176,8 @@ class DecisionRuntimeManager {
       type: 'INIT',
       modelAssetPath: modelUrl,
       modelFile: this.customModel,
-      delegate: this.delegate,
+      // GPU only, like the Semantic Retriever.
+      delegate: 'GPU',
       baseUrl,
     });
   }
@@ -234,10 +226,6 @@ class DecisionRuntimeManager {
         this.emit({ type: 'state' });
         this.emit({ type: 'status', text: 'Model ready' });
         this.emit({ type: 'ready' });
-        break;
-      case 'DELEGATE_FALLBACK':
-        this.delegate = 'CPU';
-        this.emit({ type: 'state' });
         break;
       case 'DECIDE_RESULT':
         this.resolvers.get(msg.id)?.(msg);

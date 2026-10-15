@@ -58,8 +58,9 @@ test.describe('Decision Maker Task', () => {
     // The Dino Game (and its play/step controls) is its own page now; here the Evaluate button is the gate.
     await expect(page.locator('#dt-evaluate')).toBeDisabled();
 
-    // Changing the delegate or the model selection must not start a download either
-    await page.selectOption('#delegate-select', 'CPU');
+    // GPU only: there is no delegate select.
+    await expect(page.locator('#delegate-select')).toHaveCount(0);
+    // Changing the model selection must not start a download either
     await page.selectOption('.model-select', 'laya_s256');
     await page.waitForTimeout(1500);
     expect(modelRequests).toEqual([]);

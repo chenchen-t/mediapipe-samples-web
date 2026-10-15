@@ -71,9 +71,6 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
     const url: string = this.currentOptions.modelAssetPath ?? '';
     const modelNameHint = `${file?.name ?? ''} ${url}`.toLowerCase();
     this.isEmbeddingGemma = modelNameHint.includes('embeddinggemma') || modelNameHint.endsWith('.litertlm');
-    const isVisionLiteRtLm =
-      modelNameHint.endsWith('.litertlm') &&
-      (modelNameHint.includes('vision') || modelNameHint.includes('435m') || modelNameHint.includes('440m'));
 
     // Stream the model (cached download or uploaded file) so it isn't copied
     // into one big JS buffer; the size lets the wasm allocate it in one pass.
@@ -84,9 +81,9 @@ class DecisionMakerWorker extends BaseWorker<DecisionMaker> {
         delegate: this.currentOptions.delegate === 'GPU' ? 'GPU' : 'CPU',
       },
       ...(size ? { modelAssetSize: size } : {}),
-      // Vision .litertlm rules fit well within 256 tokens; avoiding 4096 skips
-      // compiling extra text encoder signature buckets during initialization.
-      maxNumTokens: isVisionLiteRtLm ? 256 : 4096,
+      // With @mediapipe/tasks-decision 1.1.1, larger budgets (e.g. 4096) make LiteRT-LM
+      // EmbeddingEngine creation fail on WebGPU for the EmbeddingGemma-2 models.
+      maxNumTokens: 256,
     });
 
     // Serialize all asyncify Wasm calls through a per-module promise queue so

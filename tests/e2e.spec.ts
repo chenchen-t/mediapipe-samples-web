@@ -220,5 +220,33 @@ test.describe('Navigation & UI', () => {
       'href',
       'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fsemantic-retriever.ts'
     );
+
+    // Navigate to Decision Maker and verify banner links
+    await page.click('a[data-task="decision-maker"]');
+    await expect(taskDocsLink).toContainText('Decision Maker Guide');
+    await expect(taskDocsLink).toHaveAttribute(
+      'href',
+      'https://developers.google.com/edge/mediapipe/solutions/decision/decision_maker'
+    );
+    await expect(webSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples-web/blob/main/src/tasks/decision-maker.ts'
+    );
+    await expect(androidSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/decision_maker/android'
+    );
+    await expect(iosSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/decision_maker/ios'
+    );
+    await expect(pythonSampleLink).toHaveAttribute(
+      'href',
+      'https://github.com/google-ai-edge/mediapipe-samples/tree/main/examples/decision_maker/python'
+    );
+    await expect(stackblitzLink).toHaveAttribute(
+      'href',
+      'https://stackblitz.com/github/google-ai-edge/mediapipe-samples-web?file=src%2Ftasks%2Fdecision-maker.ts'
+    );
   });
 });

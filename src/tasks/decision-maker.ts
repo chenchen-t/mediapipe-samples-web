@@ -26,7 +26,6 @@
 
 import template from '../templates/decision-maker.html?raw';
 import { InferenceTimer } from '../components/inference-timer';
-import { ViewToggle } from '../components/view-toggle';
 import { DECISION_MODELS, decisionRuntime } from '../components/decision-runtime';
 import { mountDecisionModelPanel, type DecisionModelPanelHandle } from '../components/decision-model-panel';
 import { DecisionTextPlayground } from './decision-maker-text';
@@ -78,22 +77,6 @@ class DecisionMakerTask {
     );
     this.visionPlayground.init();
 
-    new ViewToggle(
-      'view-mode-toggle',
-      [
-        { label: 'Text', value: 'text', icon: 'notes' },
-        { label: 'Vision', value: 'vision', icon: 'badge' },
-        { label: 'Game', value: 'game', icon: 'sports_esports' },
-      ],
-      this.mode,
-      (value) => {
-        if (value === 'game') {
-          window.location.hash = '/decision/dino_game';
-          return;
-        }
-        this.setMode(value as 'text' | 'vision');
-      }
-    );
     // Model controls and state are shared with the Dino Game page.
     this.modelPanel = mountDecisionModelPanel(this.el['dm-model-panel'], this.mode);
     this.disposers.push(this.modelPanel);
@@ -129,6 +112,9 @@ class DecisionMakerTask {
 
   private setMode(mode: 'text' | 'vision') {
     this.mode = mode;
+    if (this.el['dm-header-title']) {
+      this.el['dm-header-title'].textContent = mode === 'vision' ? 'Decision Maker - ID Photo' : 'Decision Maker';
+    }
     this.modelPanel?.setModality(mode);
     if (mode !== 'vision') {
       this.visionPlayground.stopWebcamBooth();

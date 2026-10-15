@@ -136,13 +136,11 @@ export const PASSPORT_RULES: PassportRule[] = [
     options: [
       {
         label: 'pass_frontal',
-        description:
-          'Portrait showing the top of the head with hair, the chin, and the shirt or shoulders.',
+        description: 'Portrait showing the top of the head with hair, the chin, and the shirt or shoulders.',
       },
       {
         label: 'fail_cropped',
-        description:
-          'Tightly cropped macro close-up of only skin, eyes, nose, and lips filling the entire image.',
+        description: 'Tightly cropped macro close-up of only skin, eyes, nose, and lips filling the entire image.',
       },
     ],
     optionDisplay: {
@@ -161,8 +159,7 @@ export const PASSPORT_RULES: PassportRule[] = [
     options: [
       {
         label: 'pass_open',
-        description:
-          'Front-facing portrait of a person with open eyes looking straight ahead at the camera.',
+        description: 'Front-facing portrait of a person with open eyes looking straight ahead at the camera.',
       },
       {
         label: 'fail_looking_away',
@@ -631,9 +628,7 @@ export class DecisionVisionPlayground {
           url: p.url,
           rawPassProb: defaultProb,
           logitVal: logit(defaultProb),
-          logitVec: PASSPORT_RULES.map((r) =>
-            logit(!(defaultFails[p.id] ?? []).includes(r.id) ? 0.82 : 0.18)
-          ),
+          logitVec: PASSPORT_RULES.map((r) => logit(!(defaultFails[p.id] ?? []).includes(r.id) ? 0.82 : 0.18)),
           enabled: true,
           isDefault: true,
         };
@@ -911,17 +906,13 @@ export class DecisionVisionPlayground {
       const bank = this.ruleExemplarBank[rule.id];
       const hasExemplarCustomization = Boolean(
         bank &&
-          (bank.positives.some((x) => !x.isDefault || !x.enabled) ||
-            bank.negatives.some((x) => !x.isDefault || !x.enabled))
+        (bank.positives.some((x) => !x.isDefault || !x.enabled) ||
+          bank.negatives.some((x) => !x.isDefault || !x.enabled))
       );
       const activePos =
-        hasExemplarCustomization && bank
-          ? bank.positives.filter((x) => x.enabled && x.id !== photoObj.id)
-          : [];
+        hasExemplarCustomization && bank ? bank.positives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
       const activeNeg =
-        hasExemplarCustomization && bank
-          ? bank.negatives.filter((x) => x.enabled && x.id !== photoObj.id)
-          : [];
+        hasExemplarCustomization && bank ? bank.negatives.filter((x) => x.enabled && x.id !== photoObj.id) : [];
 
       let calPassProb = rawPassProb;
       if (activePos.length > 0 && activeNeg.length > 0) {
@@ -1073,7 +1064,7 @@ export class DecisionVisionPlayground {
         banner.className = 'dv-verdict-banner ' + (allPassed ? 'pass' : 'fail');
         iconEl.textContent = allPassed ? 'check_circle' : 'error';
         const failCount = PASSPORT_RULES.length - passCount;
-        titleEl.textContent = allPassed ? 'COMPLIANT' : `${failCount} ISSUE${failCount > 1 ? 'S' : ''} DETECTED`;
+        titleEl.textContent = allPassed ? 'COMPLIANT' : `${failCount} ISSUE${failCount > 1 ? 'S' : ''}`;
         subEl.textContent = `${passCount} / ${PASSPORT_RULES.length} Passed`;
       }
     }

@@ -104,18 +104,11 @@ test.describe('Decision Maker Task', () => {
     await expect(page.locator(`#${containerId}-tab-standard`)).toHaveClass(/active/);
   });
 
-  test('should switch between Text, Vision, and Game tabs and evaluate ID photo presets', async ({ page }) => {
-    await page.goto('/#/decision/decision_maker');
+  test('should render ID photo route and evaluate ID photo presets', async ({ page }) => {
+    await page.goto('/#/decision/id_photo');
     await page.waitForLoadState('domcontentloaded');
 
-    const toggle = page.locator('#view-mode-toggle');
-    await expect(toggle.locator('button[data-value="text"]')).toHaveClass(/active/);
-    await expect(toggle.locator('button[data-value="vision"]')).toBeVisible();
-    await expect(toggle.locator('button[data-value="game"]')).toBeVisible();
-
-    // Switch to Vision tab
-    await toggle.locator('button[data-value="vision"]').click();
-    await expect(toggle.locator('button[data-value="vision"]')).toHaveClass(/active/);
+    await expect(page.locator('.output-header h2')).toHaveText('Decision Maker - ID Photo');
     await expect(page.locator('#dm-vision-view')).toBeVisible();
     await expect(page.locator('.model-select')).toHaveValue('embeddinggemma2_text_vision_440m');
     await expect(page.locator('#dv-preset-strip .dv-preset-btn')).toHaveCount(8);
@@ -124,12 +117,12 @@ test.describe('Decision Maker Task', () => {
     const expectedPresetVerdicts: Array<{ id: string; title: string; sub: string }> = [
       { id: 'passport_compliant_female.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
       { id: 'passport_compliant_male.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
-      { id: 'id_fail_glasses_smile.jpg', title: '3 ISSUES DETECTED', sub: '6 / 9 Passed' },
-      { id: 'id_fail_eyes_closed_hair.jpg', title: '2 ISSUES DETECTED', sub: '7 / 9 Passed' },
-      { id: 'id_fail_extreme_zoom_cropped.jpg', title: '5 ISSUES DETECTED', sub: '4 / 9 Passed' },
-      { id: 'id_fail_distant_waist_up.jpg', title: '4 ISSUES DETECTED', sub: '5 / 9 Passed' },
-      { id: 'id_fail_tilted_glasses_selfie.jpg', title: '8 ISSUES DETECTED', sub: '1 / 9 Passed' },
-      { id: 'id_fail_mask_hat.jpg', title: '6 ISSUES DETECTED', sub: '3 / 9 Passed' },
+      { id: 'id_fail_glasses_smile.jpg', title: '3 ISSUES', sub: '6 / 9 Passed' },
+      { id: 'id_fail_eyes_closed_hair.jpg', title: '2 ISSUES', sub: '7 / 9 Passed' },
+      { id: 'id_fail_extreme_zoom_cropped.jpg', title: '5 ISSUES', sub: '4 / 9 Passed' },
+      { id: 'id_fail_distant_waist_up.jpg', title: '4 ISSUES', sub: '5 / 9 Passed' },
+      { id: 'id_fail_tilted_glasses_selfie.jpg', title: '8 ISSUES', sub: '1 / 9 Passed' },
+      { id: 'id_fail_mask_hat.jpg', title: '6 ISSUES', sub: '3 / 9 Passed' },
     ];
 
     for (const preset of expectedPresetVerdicts) {

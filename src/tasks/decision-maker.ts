@@ -32,7 +32,7 @@ import { DecisionTextPlayground } from './decision-maker-text';
 
 class DecisionMakerTask {
   /** Shared "Inference Time" badge + history graph, same as the other tasks. */
-  private inferenceTimer = new InferenceTimer();
+  private inferenceTimer = new InferenceTimer({ mode: 'single', labelA: 'Evaluation' });
   private textPlayground!: DecisionTextPlayground;
   private disposers: (() => void)[] = [];
   private el: Record<string, HTMLElement> = {};
@@ -50,14 +50,14 @@ class DecisionMakerTask {
       (kind, text, question) => decisionRuntime.ask(text, kind, question),
       (text, inferenceTime) => {
         if (inferenceTime === undefined) return this.setStatus(text);
-        this.inferenceTimer.record(inferenceTime, decisionRuntime.delegate);
+        this.inferenceTimer.recordSingle(inferenceTime);
         this.setStatus(`Done in ${Math.round(inferenceTime)}ms`);
       }
     );
     this.textPlayground.init();
 
     // Model controls and state are shared with the Dino Game page.
-    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel'], this.el['dm-delegate-panel']));
+    this.disposers.push(mountDecisionModelPanel(this.el['dm-model-panel']));
     this.disposers.push(
       decisionRuntime.subscribe((event) => {
         if (event.type === 'loading') {

@@ -12,8 +12,8 @@ importers:
         specifier: ^1.1.0
         version: 1.1.0
       '@mediapipe/tasks-decision':
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.1.1
+        version: 1.1.1
       '@mediapipe/tasks-retrieval':
         specifier: ^1.1.0
         version: 1.1.0
@@ -216,8 +216,8 @@ packages:
   '@mediapipe/tasks-audio@1.1.0':
     resolution: {integrity: sha512-8Q6xVHr/8h20cIa2aS/QfAUmNeyWSLlfhzF/lD4uVMbfdIkjiEMSu64roPO+pbQsUswaw1krflvjfiHSgWpYOw==}
 
-  '@mediapipe/tasks-decision@1.1.0':
-    resolution: {integrity: sha512-WjbOVtj305Lzs5IwF5TOAMDlnW8T1ILQP6efZJGMv9WZgJquwDPZzrheIQve2Zrp7COGHrYuOhuuQF6z/bWOIg==}
+  '@mediapipe/tasks-decision@1.1.1':
+    resolution: {integrity: sha512-KaTpkVw6UB7UpuAvzzlRXHbNKScvoYIZWG+ltBnlV49MJMPT3sCE4mmxlbCk3fC2GWudxL9ZfpSKKeZ43/W9mQ==}
 
   '@mediapipe/tasks-retrieval@1.1.0':
     resolution: {integrity: sha512-wRA7+yUiwCkKmAvCTovMbR8tZz/pvUvK6mKoEPXaiGu+2g1Hn2fn9aBxnuCJywlvp1ab4HwOi0HmEmieFn5F7Q==}
@@ -773,7 +773,7 @@ snapshots:
 
   '@mediapipe/tasks-audio@1.1.0': {}
 
-  '@mediapipe/tasks-decision@1.1.0': {}
+  '@mediapipe/tasks-decision@1.1.1': {}
 
   '@mediapipe/tasks-retrieval@1.1.0': {}
 

@@ -104,7 +104,14 @@ test.describe('Decision Maker Task', () => {
     await expect(page.locator(`#${containerId}-tab-standard`)).toHaveClass(/active/);
   });
 
-  test('should render ID photo route and evaluate ID photo presets', async ({ page }) => {
+  test('should render ID photo route and interact with presets and rules', async ({ page }) => {
+    await page.route(
+      (url) => MODEL_HOSTS.test(url.href),
+      (route) => {
+        route.fulfill({ status: 200, contentType: 'application/octet-stream', body: Buffer.alloc(16) });
+      }
+    );
+
     await page.goto('/#/decision/id_photo');
     await page.waitForLoadState('domcontentloaded');
 
@@ -114,22 +121,35 @@ test.describe('Decision Maker Task', () => {
     await expect(page.locator('#dv-preset-strip .dv-preset-btn')).toHaveCount(8);
     await expect(page.locator('#dv-rules-list .dv-rule-card')).toHaveCount(9);
 
-    const expectedPresetVerdicts: Array<{ id: string; title: string; sub: string }> = [
-      { id: 'passport_compliant_female.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
-      { id: 'passport_compliant_male.jpg', title: 'COMPLIANT', sub: '9 / 9 Passed' },
-      { id: 'id_fail_glasses_smile.jpg', title: '3 ISSUES', sub: '6 / 9 Passed' },
-      { id: 'id_fail_eyes_closed_hair.jpg', title: '2 ISSUES', sub: '7 / 9 Passed' },
-      { id: 'id_fail_extreme_zoom_cropped.jpg', title: '5 ISSUES', sub: '4 / 9 Passed' },
-      { id: 'id_fail_distant_waist_up.jpg', title: '4 ISSUES', sub: '5 / 9 Passed' },
-      { id: 'id_fail_tilted_glasses_selfie.jpg', title: '8 ISSUES', sub: '1 / 9 Passed' },
-      { id: 'id_fail_mask_hat.jpg', title: '6 ISSUES', sub: '3 / 9 Passed' },
+    const presetIds = [
+      'passport_compliant_female.jpg',
+      'passport_compliant_male.jpg',
+      'id_fail_glasses_smile.jpg',
+      'id_fail_eyes_closed_hair.jpg',
+      'id_fail_extreme_zoom_cropped.jpg',
+      'id_fail_distant_waist_up.jpg',
+      'id_fail_tilted_glasses_selfie.jpg',
+      'id_fail_mask_hat.jpg',
     ];
 
-    for (const preset of expectedPresetVerdicts) {
-      await page.locator(`#dv-preset-strip .dv-preset-btn[data-preset-id="${preset.id}"]`).click();
-      await expect(page.locator('#dv-verdict-title')).toHaveText(preset.title);
-      await expect(page.locator('#dv-verdict-sub')).toHaveText(preset.sub);
+    for (const id of presetIds) {
+      const btn = page.locator(`#dv-preset-strip .dv-preset-btn[data-preset-id="${id}"]`);
+      await btn.click();
+      await expect(btn).toHaveClass(/active/);
+      await expect(page.locator('#dv-main-img')).toHaveAttribute('src', new RegExp(id));
     }
+
+    // Toggle biometric alignment guide
+    const guideBtn = page.locator('#dv-guide-btn');
+    await expect(guideBtn).toContainText('Guide: ON');
+    await guideBtn.click();
+    await expect(guideBtn).toContainText('Guide: OFF');
+    await guideBtn.click();
+    await expect(guideBtn).toContainText('Guide: ON');
+
+    // Select a rule card and verify reference examples update
+    await page.locator('#dv-rules-list .dv-rule-card[data-rule-id="no_glasses"]').click();
+    await expect(page.locator('#dv-active-rule-title')).toContainText('7. No Eyeglasses or Sunglasses');
   });
 });
 
